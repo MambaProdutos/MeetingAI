@@ -6,7 +6,7 @@
 // --- Configuration ---
 const API_KEY = 'AIzaSyC987HTopzfXyzf0v948gAOB8lBlP_9_jc';
 // Using gemini-pro as it is the standard stable model
-const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
+const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent';
 
 // --- State Management ---
 const state = {
@@ -473,3 +473,4 @@ function showToast(message, type = 'success') {
 
 // Start
 document.addEventListener('DOMContentLoaded', init);
+
