@@ -1,150 +1,167 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Meeting Analysis Dashboard</title>
+    <title>Meeting AI - Análise de Reuniões</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
+
     <div class="app-container">
-        <!-- Sidebar -->
-        <aside class="sidebar">
-            <div class="logo-container">
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="32" height="32" rx="8" fill="url(#logo-gradient)"/>
-                    <path d="M16 8L24 24H8L16 8Z" fill="white"/>
-                    <defs>
-                        <linearGradient id="logo-gradient" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-                            <stop stop-color="#6366F1"/>
-                            <stop offset="1" stop-color="#8B5CF6"/>
-                        </linearGradient>
-                    </defs>
+        <!-- SIDEBAR -->
+        <nav class="sidebar">
+            <div class="brand">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path
+                        d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
+                    </path>
+                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                    <line x1="12" y1="22.08" x2="12" y2="12"></line>
                 </svg>
-                <h1>Meeting<span class="highlight">AI</span></h1>
+                <span>MeetingAI</span>
             </div>
-            
-            <nav class="nav-menu">
-                <button class="nav-item active" data-view="new-analysis">
-                    <span class="icon">📝</span>
-                    Nova Análise
-                </button>
-                <button class="nav-item" data-view="playbooks">
-                    <span class="icon">📚</span>
-                    Playbooks
-                </button>
-                <button class="nav-item" data-view="dashboard">
-                    <span class="icon">📊</span>
-                    Dashboard
-                </button>
-            </nav>
 
-            <div class="sidebar-footer">
-                <p>v1.0.0</p>
+            <div class="nav-menu">
+                <div class="nav-item" onclick="app.navigate('upload')">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    <span class="nav-text">Nova Análise</span>
+                </div>
+                <div class="nav-item" onclick="app.navigate('playbooks')">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                    <span class="nav-text">Playbooks</span>
+                </div>
+                <div class="nav-item" onclick="app.navigate('dashboard')">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="14" width="7" height="7"></rect>
+                        <rect x="3" y="14" width="7" height="7"></rect>
+                    </svg>
+                    <span class="nav-text">Dashboard</span>
+                </div>
             </div>
-        </aside>
+        </nav>
 
-        <!-- Main Content -->
+        <!-- MAIN CONTENT -->
         <main class="main-content">
-            
-            <!-- View: New Analysis -->
-            <section id="view-new-analysis" class="view-section active">
-                <header class="view-header">
-                    <h2>Nova Análise</h2>
-                    <p>Cole a transcrição da reunião para iniciar a análise com IA.</p>
-                </header>
 
-                <div class="analysis-container">
+            <!-- VIEW: UPLOAD/NEW ANALYSIS -->
+            <section id="view-upload" class="view-section active">
+                <h1>Nova Análise</h1>
+                <p class="subtitle">Cole a transcrição da reunião para receber insights baseados nos seus playbooks.</p>
+
+                <div class="card">
                     <div class="input-group">
-                        <label for="transcription-text">Transcrição da Reunião</label>
-                        <textarea id="transcription-text" placeholder="Cole o texto da transcrição aqui..."></textarea>
+                        <label>Transcrição da Reunião</label>
+                        <textarea id="transcript-input"
+                            placeholder="Cole o texto aqui (Ex: Vendedor: Olá, tudo bem? Cliente: Tudo ótimo...)"></textarea>
                     </div>
 
-                    <div class="divider">
-                        <span>OU</span>
+                    <div class="input-group">
+                        <label>Ou faça upload de um arquivo de texto (.txt)</label>
+                        <input type="file" id="transcript-file" accept=".txt" onchange="app.handleTranscriptFile(this)">
                     </div>
 
-                    <div class="upload-zone" id="transcription-upload">
-                        <div class="upload-content">
-                            <span class="icon">📄</span>
-                            <p>Arraste um arquivo de texto (.txt) ou clique para selecionar</p>
-                            <input type="file" id="transcription-file" accept=".txt" hidden>
-                        </div>
-                    </div>
+                    <button id="btn-analyze" class="btn" onclick="app.runAnalysis()">
+                        <span class="btn-text">Analisar com IA</span>
+                        <div class="spinner" style="display: none;"></div>
+                    </button>
+                </div>
 
-                    <div class="actions">
-                        <button id="btn-analyze" class="btn-primary">
-                            <span class="btn-text">Iniciar Análise</span>
-                            <div class="spinner hidden"></div>
-                        </button>
-                    </div>
+                <div class="card" style="border-left: 4px solid var(--primary);">
+                    <h4>💡 Dica</h4>
+                    <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.5rem;">
+                        Certifique-se de que seus Playbooks estão cadastrados na aba "Playbooks" para uma análise mais
+                        precisa.
+                    </p>
                 </div>
             </section>
 
-            <!-- View: Playbooks -->
+            <!-- VIEW: PLAYBOOKS -->
             <section id="view-playbooks" class="view-section">
-                <header class="view-header">
-                    <h2>Playbooks</h2>
-                    <p>Gerencie os arquivos PDF que servirão de contexto para a IA.</p>
-                </header>
+                <h1>Gerenciar Playbooks</h1>
+                <p class="subtitle">Faça upload dos seus guias de vendas e metodologias (PDF).</p>
 
-                <div class="playbooks-container">
-                    <div class="upload-zone" id="playbook-upload">
-                        <div class="upload-content">
-                            <span class="icon">📂</span>
-                            <p>Arraste seus Playbooks (PDF) aqui ou clique para adicionar</p>
-                            <input type="file" id="playbook-file" accept="application/pdf" multiple hidden>
-                        </div>
-                    </div>
+                <div class="upload-zone" id="drop-zone">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"
+                        style="color: var(--primary); margin-bottom: 1rem;">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    <p>Arraste e solte seus PDFs aqui ou <span style="color: var(--primary); font-weight: 600;">clique
+                            para buscar</span></p>
+                    <input type="file" id="playbook-input" accept="application/pdf" multiple style="display: none;">
+                </div>
 
-                    <div class="playbooks-list" id="playbooks-list">
-                        <!-- Playbook items will be injected here -->
-                        <div class="empty-state">
-                            <p>Nenhum playbook cadastrado.</p>
-                        </div>
-                    </div>
+                <h3 style="margin-top: 2rem; margin-bottom: 1rem;">Playbooks Ativos</h3>
+                <div id="playbook-list" class="file-list">
+                    <!-- Files will be injected here -->
                 </div>
             </section>
 
-            <!-- View: Dashboard -->
+            <!-- VIEW: DASHBOARD -->
             <section id="view-dashboard" class="view-section">
-                <header class="view-header">
-                    <h2>Resultados da Análise</h2>
-                    <div class="meeting-meta" id="meeting-meta">
-                        <span class="badge" id="meeting-type">Tipo: --</span>
-                        <span class="badge" id="meeting-duration">Duração: --</span>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h1>Resultados da Análise</h1>
+                    <button class="btn btn-outline" onclick="app.navigate('upload')">Nova Análise</button>
+                </div>
+
+                <!-- Score Header -->
+                <div class="card"
+                    style="background: linear-gradient(90deg, rgba(99, 102, 241, 0.1) 0%, transparent 100%); border-left: 4px solid var(--primary);">
+                    <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+                        <div>
+                            <span style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Tipo
+                                de Reunião</span>
+                            <h3 id="res-type">---</h3>
+                        </div>
+                        <div>
+                            <span
+                                style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Duração
+                                Estimada</span>
+                            <h3 id="res-duration">---</h3>
+                        </div>
+                        <div>
+                            <span
+                                style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Objetivo</span>
+                            <h3 id="res-objective" style="font-size: 1rem; max-width: 400px;">---</h3>
+                        </div>
                     </div>
-                </header>
+                </div>
 
                 <div class="dashboard-grid">
-                    <!-- Score Card -->
-                    <div class="card score-card">
-                        <h3>Score Geral</h3>
-                        <div class="score-circle">
-                            <span id="overall-score">--</span>
-                            <small>/100</small>
-                        </div>
-                        <p id="meeting-objective" class="meeting-objective">Objetivo da reunião aparecerá aqui...</p>
-                    </div>
-
-                    <!-- Chart Card -->
-                    <div class="card chart-card">
-                        <h3>Performance por Métrica</h3>
+                    <!-- Chart Column -->
+                    <div class="card">
+                        <h4 style="margin-bottom: 1rem; text-align: center;">Performance Multidimensional</h4>
                         <div class="chart-container">
-                            <canvas id="metrics-chart"></canvas>
+                            <canvas id="radarChart" width="300" height="300"></canvas>
                         </div>
                     </div>
 
-                    <!-- Feedback Card -->
-                    <div class="card feedback-card full-width">
-                        <h3>Feedback Detalhado</h3>
-                        <div class="feedback-list" id="feedback-list">
-                            <!-- Feedback items will be injected here -->
-                            <div class="empty-state">
-                                <p>Aguardando análise...</p>
+                    <!-- Metrics & Feedback Column -->
+                    <div>
+                        <div class="card">
+                            <h4 style="margin-bottom: 1rem;">Pontos de Atenção & Sugestões</h4>
+                            <div id="feedback-container" class="feedback-list">
+                                <p style="color: var(--text-muted); text-align: center; padding: 2rem;">Nenhuma análise
+                                    realizada ainda.</p>
                             </div>
                         </div>
                     </div>
@@ -154,9 +171,10 @@
         </main>
     </div>
 
-    <!-- Toast Notification -->
-    <div id="toast" class="toast hidden"></div>
+    <!-- TOAST CONTAINER -->
+    <div id="toast-container"></div>
 
     <script src="app.js"></script>
 </body>
+
 </html>
