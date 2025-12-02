@@ -5,7 +5,7 @@
 
 // --- Configuration ---
 const API_KEY = 'AIzaSyC987HTopzfXyzf0v948gAOB8lBlP_9_jc';
-const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent';
 
 // --- State Management ---
 const state = {
