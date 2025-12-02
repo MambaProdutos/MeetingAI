@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meeting Analysis Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo-container">
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="32" height="32" rx="8" fill="url(#logo-gradient)"/>
+                    <path d="M16 8L24 24H8L16 8Z" fill="white"/>
+                    <defs>
+                        <linearGradient id="logo-gradient" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+                            <stop stop-color="#6366F1"/>
+                            <stop offset="1" stop-color="#8B5CF6"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+                <h1>Meeting<span class="highlight">AI</span></h1>
+            </div>
+            
+            <nav class="nav-menu">
+                <button class="nav-item active" data-view="new-analysis">
+                    <span class="icon">📝</span>
+                    Nova Análise
+                </button>
+                <button class="nav-item" data-view="playbooks">
+                    <span class="icon">📚</span>
+                    Playbooks
+                </button>
+                <button class="nav-item" data-view="dashboard">
+                    <span class="icon">📊</span>
+                    Dashboard
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <p>v1.0.0</p>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            
+            <!-- View: New Analysis -->
+            <section id="view-new-analysis" class="view-section active">
+                <header class="view-header">
+                    <h2>Nova Análise</h2>
+                    <p>Cole a transcrição da reunião para iniciar a análise com IA.</p>
+                </header>
+
+                <div class="analysis-container">
+                    <div class="input-group">
+                        <label for="transcription-text">Transcrição da Reunião</label>
+                        <textarea id="transcription-text" placeholder="Cole o texto da transcrição aqui..."></textarea>
+                    </div>
+
+                    <div class="divider">
+                        <span>OU</span>
+                    </div>
+
+                    <div class="upload-zone" id="transcription-upload">
+                        <div class="upload-content">
+                            <span class="icon">📄</span>
+                            <p>Arraste um arquivo de texto (.txt) ou clique para selecionar</p>
+                            <input type="file" id="transcription-file" accept=".txt" hidden>
+                        </div>
+                    </div>
+
+                    <div class="actions">
+                        <button id="btn-analyze" class="btn-primary">
+                            <span class="btn-text">Iniciar Análise</span>
+                            <div class="spinner hidden"></div>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- View: Playbooks -->
+            <section id="view-playbooks" class="view-section">
+                <header class="view-header">
+                    <h2>Playbooks</h2>
+                    <p>Gerencie os arquivos PDF que servirão de contexto para a IA.</p>
+                </header>
+
+                <div class="playbooks-container">
+                    <div class="upload-zone" id="playbook-upload">
+                        <div class="upload-content">
+                            <span class="icon">📂</span>
+                            <p>Arraste seus Playbooks (PDF) aqui ou clique para adicionar</p>
+                            <input type="file" id="playbook-file" accept="application/pdf" multiple hidden>
+                        </div>
+                    </div>
+
+                    <div class="playbooks-list" id="playbooks-list">
+                        <!-- Playbook items will be injected here -->
+                        <div class="empty-state">
+                            <p>Nenhum playbook cadastrado.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- View: Dashboard -->
+            <section id="view-dashboard" class="view-section">
+                <header class="view-header">
+                    <h2>Resultados da Análise</h2>
+                    <div class="meeting-meta" id="meeting-meta">
+                        <span class="badge" id="meeting-type">Tipo: --</span>
+                        <span class="badge" id="meeting-duration">Duração: --</span>
+                    </div>
+                </header>
+
+                <div class="dashboard-grid">
+                    <!-- Score Card -->
+                    <div class="card score-card">
+                        <h3>Score Geral</h3>
+                        <div class="score-circle">
+                            <span id="overall-score">--</span>
+                            <small>/100</small>
+                        </div>
+                        <p id="meeting-objective" class="meeting-objective">Objetivo da reunião aparecerá aqui...</p>
+                    </div>
+
+                    <!-- Chart Card -->
+                    <div class="card chart-card">
+                        <h3>Performance por Métrica</h3>
+                        <div class="chart-container">
+                            <canvas id="metrics-chart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Feedback Card -->
+                    <div class="card feedback-card full-width">
+                        <h3>Feedback Detalhado</h3>
+                        <div class="feedback-list" id="feedback-list">
+                            <!-- Feedback items will be injected here -->
+                            <div class="empty-state">
+                                <p>Aguardando análise...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast hidden"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
