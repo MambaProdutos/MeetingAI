@@ -7,6 +7,7 @@ const app = {
     state: {
         currentView: 'upload',
         playbooks: [], // Stores { name: string, date: string }
+        analyses: [], // Stores { id, collaborator, meetingName, date, score, result }
         analysisResult: null
     },
 
@@ -20,6 +21,7 @@ const app = {
     // Initialization
     init: function () {
         this.loadPlaybooks();
+        this.loadAnalyses();
         this.setupNavigation();
         this.setupDragDrop();
         this.navigate('upload');
@@ -35,14 +37,22 @@ const app = {
         document.getElementById(`view-${viewId}`).classList.add('active');
 
         document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-        // Find index based on viewId simple mapping
-        const navIndex = viewId === 'upload' ? 0 : viewId === 'playbooks' ? 1 : 2;
-        const navItem = document.querySelectorAll('.nav-item')[navIndex];
-        if (navItem) navItem.classList.add('active');
 
-        // If going to dashboard without data, warn
-        if (viewId === 'dashboard' && !this.state.analysisResult) {
-            // Optional: this.showToast('Nenhuma análise disponível ainda.', 'warning');
+        // Find index based on viewId simple mapping
+        let navIndex = -1;
+        if (viewId === 'upload') navIndex = 0;
+        else if (viewId === 'playbooks') navIndex = 1;
+        else if (viewId === 'dashboard') navIndex = 2;
+        else if (viewId === 'collaborators' || viewId === 'collaborator-detail') navIndex = 3; // New menu item
+
+        if (navIndex >= 0) {
+            const navItem = document.querySelectorAll('.nav-item')[navIndex];
+            if (navItem) navItem.classList.add('active');
+        }
+
+        // View specific logic
+        if (viewId === 'collaborators') {
+            this.renderCollaboratorsList();
         }
     },
 
@@ -50,7 +60,7 @@ const app = {
         // Done via onclick in HTML for simplicity
     },
 
-    // --- PLAYBOOK MANAGEMENT ---
+    // --- DATA MANAGEMENT ---
     loadPlaybooks: function () {
         const stored = localStorage.getItem('meeting_ai_playbooks');
         if (stored) {
@@ -64,6 +74,18 @@ const app = {
         this.renderPlaybooks();
     },
 
+    loadAnalyses: function () {
+        const stored = localStorage.getItem('meeting_ai_analyses');
+        if (stored) {
+            this.state.analyses = JSON.parse(stored);
+        }
+    },
+
+    saveAnalyses: function () {
+        localStorage.setItem('meeting_ai_analyses', JSON.stringify(this.state.analyses));
+    },
+
+    // --- PLAYBOOK ACTIONS ---
     addPlaybook: function (file) {
         // Validate duplicate
         if (this.state.playbooks.some(p => p.name === file.name)) {
@@ -161,6 +183,12 @@ const app = {
         const file = input.files[0];
         if (!file) return;
 
+        // Auto-fill meeting name from filename
+        const meetingNameInput = document.getElementById('meeting-name');
+        if (meetingNameInput && !meetingNameInput.value) {
+            meetingNameInput.value = file.name.replace(/\.[^/.]+$/, ""); // Remove extension
+        }
+
         const reader = new FileReader();
         reader.onload = (e) => {
             document.getElementById('transcript-input').value = e.target.result;
@@ -172,6 +200,8 @@ const app = {
     // --- GEMINI ANALYSIS LOGIC ---
     runAnalysis: async function () {
         const transcript = document.getElementById('transcript-input').value.trim();
+        const collaborator = document.getElementById('collaborator-name').value.trim() || 'Desconhecido';
+        const meetingName = document.getElementById('meeting-name').value.trim() || `Reunião ${new Date().toLocaleDateString()}`;
 
         // Validations
         if (!transcript) {
@@ -207,6 +237,7 @@ const app = {
                     "meetingType": "String (ex: Vendas, Suporte, Onboarding)",
                     "objective": "Resumo de 1 frase",
                     "duration": "Estimativa baseada no texto (ex: 30 min)",
+                    "overallScore": 0-100 (Nota geral de qualidade da reunião),
                     "metrics": {
                         "Conhecimento Técnico": 0-100,
                         "Rapport": 0-100,
@@ -250,19 +281,29 @@ const app = {
 
             const jsonResult = JSON.parse(textResult);
 
+            // Save Analysis
+            const newAnalysis = {
+                id: Date.now().toString(),
+                collaborator: collaborator,
+                meetingName: meetingName,
+                date: new Date().toLocaleDateString(),
+                score: jsonResult.overallScore || 0,
+                result: jsonResult
+            };
+
+            this.state.analyses.unshift(newAnalysis); // Add to beginning
+            this.saveAnalyses();
             this.state.analysisResult = jsonResult;
 
-            // --- CORREÇÃO AQUI ---
-            // 1. Primeiro tornamos o dashboard visível para que o canvas tenha dimensões
+            // Navigate to Dashboard
             this.navigate('dashboard');
 
-            // 2. Renderizamos o gráfico (agora que o canvas tem tamanho > 0)
-            // Usando um pequeno timeout para garantir que o reflow/layout ocorreu
+            // Render Chart
             setTimeout(() => {
                 this.renderDashboard(jsonResult);
             }, 50);
 
-            this.showToast('Análise concluída com sucesso!', 'success');
+            this.showToast('Análise concluída e salva!', 'success');
 
         } catch (error) {
             console.error(error);
@@ -335,7 +376,6 @@ const app = {
         const centerX = width / 2;
         const centerY = height / 2;
 
-        // --- CORREÇÃO AQUI ---
         // Ensure radius is never negative. If (min/2) < 40, set radius to 0 to avoid crash
         const radius = Math.max(0, (Math.min(width, height) / 2) - 40);
 
@@ -430,6 +470,87 @@ const app = {
             ctx.fillStyle = '#fff';
             ctx.fill();
         });
+    },
+
+    // --- COLLABORATORS VIEWS ---
+    renderCollaboratorsList: function () {
+        const list = document.getElementById('collaborators-list');
+        list.innerHTML = '';
+
+        // Group by collaborator
+        const grouped = {};
+        this.state.analyses.forEach(a => {
+            const name = a.collaborator;
+            if (!grouped[name]) grouped[name] = [];
+            grouped[name].push(a);
+        });
+
+        const names = Object.keys(grouped).sort();
+
+        if (names.length === 0) {
+            list.innerHTML = '<p style="color: var(--text-muted); grid-column: 1/-1; text-align: center;">Nenhum histórico encontrado.</p>';
+            return;
+        }
+
+        names.forEach(name => {
+            const count = grouped[name].length;
+            // Calculate average score
+            const avgScore = Math.round(grouped[name].reduce((sum, a) => sum + (a.score || 0), 0) / count);
+
+            const el = document.createElement('div');
+            el.className = 'collaborator-card';
+            el.onclick = () => this.openCollaboratorDetail(name);
+            el.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="margin: 0;">${name}</h3>
+                    <div class="score-badge ${this.getScoreClass(avgScore)}">${avgScore}</div>
+                </div>
+                <div style="color: var(--text-muted); font-size: 0.9rem;">
+                    ${count} reuniões analisadas
+                </div>
+            `;
+            list.appendChild(el);
+        });
+    },
+
+    openCollaboratorDetail: function (name) {
+        document.getElementById('detail-collaborator-name').textContent = name;
+        this.navigate('collaborator-detail');
+
+        const list = document.getElementById('collaborator-meetings-list');
+        list.innerHTML = '';
+
+        const meetings = this.state.analyses.filter(a => a.collaborator === name);
+
+        meetings.forEach(meeting => {
+            const el = document.createElement('div');
+            el.className = 'meeting-card';
+            el.onclick = () => this.loadAnalysisToDashboard(meeting);
+            el.innerHTML = `
+                <div>
+                    <div style="font-weight: 600; margin-bottom: 0.2rem;">${meeting.meetingName}</div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted);">
+                        ${meeting.date} • ${meeting.result.meetingType}
+                    </div>
+                </div>
+                <div class="score-badge ${this.getScoreClass(meeting.score)}">${meeting.score || 0}</div>
+            `;
+            list.appendChild(el);
+        });
+    },
+
+    loadAnalysisToDashboard: function (analysis) {
+        this.state.analysisResult = analysis.result;
+        this.navigate('dashboard');
+        setTimeout(() => {
+            this.renderDashboard(analysis.result);
+        }, 50);
+    },
+
+    getScoreClass: function (score) {
+        if (score >= 80) return 'score-high';
+        if (score >= 50) return 'score-mid';
+        return 'score-low';
     },
 
     // --- UTILS ---
