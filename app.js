@@ -304,7 +304,9 @@ async function callGeminiAPI(transcription, playbooks) {
     });
 
     if (!response.ok) {
-        throw new Error(`API Error: ${response.statusText}`);
+        const errorBody = await response.text();
+        console.error('API Error Details:', response.status, errorBody);
+        throw new Error(`API Error: ${response.status} - ${errorBody}`);
     }
 
     const data = await response.json();
