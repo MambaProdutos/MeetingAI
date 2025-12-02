@@ -1,477 +1,464 @@
 /**
- * Meeting Analysis Dashboard
- * Main Application Logic
+ * APP LOGIC
+ * Vanilla JS - Single File Structure
  */
+const app = {
+    // State
+    state: {
+        currentView: 'upload',
+        playbooks: [], // Stores { name: string, date: string }
+        analysisResult: null
+    },
 
-// --- Configuration ---
-const API_KEY = 'AIzaSyC987HTopzfXyzf0v948gAOB8lBlP_9_jc';
-// Using gemini-2.5-flash-preview-09-2025 as it is the standard stable model
-const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent';
+    // Configuration
+    config: {
+        // ATENÇÃO: Ao fazer deploy público, restrinja esta chave no Google Cloud Console para o domínio do seu site.
+        apiKey: 'AIzaSyC987HTopzfXyzf0v948gAOB8lBlP_9_jc',
+        apiUrl: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent'
+    },
 
-// --- State Management ---
-const state = {
-    currentView: 'new-analysis',
-    playbooks: [], // Array of { name: string, content: string (base64 or text) }
-    analysisResult: null,
-    isAnalyzing: false
-};
+    // Initialization
+    init: function () {
+        this.loadPlaybooks();
+        this.setupNavigation();
+        this.setupDragDrop();
+        this.navigate('upload');
+    },
 
-// --- DOM Elements ---
-const elements = {
-    navItems: document.querySelectorAll('.nav-item'),
-    views: document.querySelectorAll('.view-section'),
+    // --- NAVIGATION ---
+    navigate: function (viewId) {
+        // Update State
+        this.state.currentView = viewId;
 
-    // New Analysis View
-    transcriptionText: document.getElementById('transcription-text'),
-    transcriptionFile: document.getElementById('transcription-file'),
-    transcriptionUpload: document.getElementById('transcription-upload'),
-    btnAnalyze: document.getElementById('btn-analyze'),
-    spinner: document.querySelector('.spinner'),
-    btnText: document.querySelector('.btn-text'),
+        // UI Updates
+        document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+        document.getElementById(`view-${viewId}`).classList.add('active');
 
-    // Playbooks View
-    playbookUpload: document.getElementById('playbook-upload'),
-    playbookFile: document.getElementById('playbook-file'),
-    playbooksList: document.getElementById('playbooks-list'),
+        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+        // Find index based on viewId simple mapping
+        const navIndex = viewId === 'upload' ? 0 : viewId === 'playbooks' ? 1 : 2;
+        const navItem = document.querySelectorAll('.nav-item')[navIndex];
+        if (navItem) navItem.classList.add('active');
 
-    // Dashboard View
-    meetingType: document.getElementById('meeting-type'),
-    meetingDuration: document.getElementById('meeting-duration'),
-    overallScore: document.getElementById('overall-score'),
-    meetingObjective: document.getElementById('meeting-objective'),
-    metricsChart: document.getElementById('metrics-chart'),
-    feedbackList: document.getElementById('feedback-list'),
-
-    // Toast
-    toast: document.getElementById('toast')
-};
-
-// --- Initialization ---
-function init() {
-    loadPlaybooks();
-    setupNavigation();
-    setupUploads();
-    setupAnalysis();
-    renderPlaybooks();
-}
-
-// --- Navigation ---
-function setupNavigation() {
-    elements.navItems.forEach(item => {
-        item.addEventListener('click', () => {
-            const viewId = item.dataset.view;
-            switchView(viewId);
-        });
-    });
-}
-
-function switchView(viewId) {
-    // Update State
-    state.currentView = viewId;
-
-    // Update UI
-    elements.navItems.forEach(item => {
-        if (item.dataset.view === viewId) item.classList.add('active');
-        else item.classList.remove('active');
-    });
-
-    elements.views.forEach(view => {
-        if (view.id === `view-${viewId}`) view.classList.add('active');
-        else view.classList.remove('active');
-    });
-}
-
-// --- Playbook Management ---
-function setupUploads() {
-    // Playbook Upload
-    setupDragAndDrop(elements.playbookUpload, elements.playbookFile, handlePlaybookFiles);
-
-    // Transcription Upload
-    setupDragAndDrop(elements.transcriptionUpload, elements.transcriptionFile, handleTranscriptionFile);
-}
-
-function setupDragAndDrop(dropZone, fileInput, handler) {
-    dropZone.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', (e) => handler(e.target.files));
-
-    dropZone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropZone.classList.add('dragover');
-    });
-
-    dropZone.addEventListener('dragleave', () => {
-        dropZone.classList.remove('dragover');
-    });
-
-    dropZone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropZone.classList.remove('dragover');
-        handler(e.dataTransfer.files);
-    });
-}
-
-async function handlePlaybookFiles(files) {
-    if (!files.length) return;
-
-    for (const file of files) {
-        if (file.type !== 'application/pdf') {
-            showToast('Apenas arquivos PDF são permitidos.', 'error');
-            continue;
+        // If going to dashboard without data, warn
+        if (viewId === 'dashboard' && !this.state.analysisResult) {
+            // Optional: this.showToast('Nenhuma análise disponível ainda.', 'warning');
         }
+    },
+
+    setupNavigation: function () {
+        // Done via onclick in HTML for simplicity
+    },
+
+    // --- PLAYBOOK MANAGEMENT ---
+    loadPlaybooks: function () {
+        const stored = localStorage.getItem('meeting_ai_playbooks');
+        if (stored) {
+            this.state.playbooks = JSON.parse(stored);
+            this.renderPlaybooks();
+        }
+    },
+
+    savePlaybooks: function () {
+        localStorage.setItem('meeting_ai_playbooks', JSON.stringify(this.state.playbooks));
+        this.renderPlaybooks();
+    },
+
+    addPlaybook: function (file) {
+        // Validate duplicate
+        if (this.state.playbooks.some(p => p.name === file.name)) {
+            this.showToast(`O playbook "${file.name}" já existe.`, 'warning');
+            return;
+        }
+
+        // Add metadata only (Browser cannot easily store full PDF content in localStorage due to 5MB limit)
+        this.state.playbooks.push({
+            name: file.name,
+            date: new Date().toLocaleDateString(),
+            size: (file.size / 1024).toFixed(1) + ' KB'
+        });
+
+        this.savePlaybooks();
+        this.showToast('Playbook adicionado com sucesso!', 'success');
+    },
+
+    removePlaybook: function (index) {
+        this.state.playbooks.splice(index, 1);
+        this.savePlaybooks();
+        this.showToast('Playbook removido.', 'default');
+    },
+
+    renderPlaybooks: function () {
+        const list = document.getElementById('playbook-list');
+        list.innerHTML = '';
+
+        if (this.state.playbooks.length === 0) {
+            list.innerHTML = '<p style="color: var(--text-muted); grid-column: 1/-1; text-align: center;">Nenhum playbook cadastrado.</p>';
+            return;
+        }
+
+        this.state.playbooks.forEach((pb, index) => {
+            const el = document.createElement('div');
+            el.className = 'file-card';
+            el.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 0.8rem; overflow: hidden;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                    <div style="overflow: hidden;">
+                        <div style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${pb.name}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">${pb.date} • ${pb.size}</div>
+                    </div>
+                </div>
+                <div class="delete-btn" onclick="app.removePlaybook(${index})">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </div>
+            `;
+            list.appendChild(el);
+        });
+    },
+
+    setupDragDrop: function () {
+        const dropZone = document.getElementById('drop-zone');
+        const input = document.getElementById('playbook-input');
+
+        dropZone.addEventListener('click', () => input.click());
+
+        input.addEventListener('change', (e) => {
+            Array.from(e.target.files).forEach(file => this.addPlaybook(file));
+            input.value = ''; // Reset
+        });
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            Array.from(files).forEach(file => {
+                if (file.type === 'application/pdf') {
+                    this.addPlaybook(file);
+                } else {
+                    this.showToast('Apenas arquivos PDF são permitidos.', 'danger');
+                }
+            });
+        });
+    },
+
+    handleTranscriptFile: function (input) {
+        const file = input.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            document.getElementById('transcript-input').value = e.target.result;
+            this.showToast('Transcrição carregada!', 'success');
+        };
+        reader.readAsText(file);
+    },
+
+    // --- GEMINI ANALYSIS LOGIC ---
+    runAnalysis: async function () {
+        const transcript = document.getElementById('transcript-input').value.trim();
+
+        // Validations
+        if (!transcript) {
+            this.showToast('Por favor, insira uma transcrição.', 'warning');
+            return;
+        }
+
+        if (transcript.length < 50) {
+            this.showToast('Transcrição muito curta para análise.', 'warning');
+            return;
+        }
+
+        // UI Loading
+        const btn = document.getElementById('btn-analyze');
+        const btnText = btn.querySelector('.btn-text');
+        const spinner = btn.querySelector('.spinner');
+
+        btn.disabled = true;
+        btnText.textContent = 'Analisando...';
+        spinner.style.display = 'block';
 
         try {
-            const base64 = await fileToBase64(file);
-            const playbook = {
-                id: Date.now() + Math.random().toString(36).substr(2, 9),
-                name: file.name,
-                content: base64, // Storing base64 to send to Gemini
-                type: file.type
-            };
+            // Construct Prompt
+            const playbooksList = this.state.playbooks.map(p => p.name).join(', ');
+            const systemPrompt = `
+                Você é um especialista em análise de reuniões e coaching de vendas.
+                Analise a transcrição abaixo.
+                
+                Contexto dos Playbooks Ativos (considere as melhores práticas inferidas pelos títulos): ${playbooksList || "Nenhum playbook específico, use boas práticas gerais de vendas."}
 
-            state.playbooks.push(playbook);
-        } catch (error) {
-            console.error('Erro ao ler arquivo:', error);
-            showToast(`Erro ao carregar ${file.name}`, 'error');
-        }
-    }
+                Retorne APENAS um objeto JSON válido (sem markdown, sem code blocks) com a seguinte estrutura:
+                {
+                    "meetingType": "String (ex: Vendas, Suporte, Onboarding)",
+                    "objective": "Resumo de 1 frase",
+                    "duration": "Estimativa baseada no texto (ex: 30 min)",
+                    "metrics": {
+                        "Conhecimento Técnico": 0-100,
+                        "Rapport": 0-100,
+                        "Estratégia em Marketplaces": 0-100,
+                        "Comunicação Clara": 0-100,
+                        "Resolução de Problemas": 0-100
+                    },
+                    "feedback": [
+                        {
+                            "category": "Nome da métrica relacionada",
+                            "issue": "O que foi feito errado ou poderia melhorar",
+                            "suggestion": "Sugestão acionável",
+                            "timestamp": "Momento aproximado (ex: Começo, Meio ou HH:MM:SS)",
+                            "severity": "warning ou critical"
+                        }
+                    ]
+                }
+            `;
 
-    savePlaybooks();
-    renderPlaybooks();
-    showToast(`${files.length} playbook(s) adicionado(s) com sucesso!`);
-}
+            // API Call
+            const response = await fetch(`${this.config.apiUrl}?key=${this.config.apiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [{ text: systemPrompt + "\n\nTRANSCRICÃO:\n" + transcript }]
+                    }]
+                })
+            });
 
-function handleTranscriptionFile(files) {
-    if (!files.length) return;
-    const file = files[0];
-
-    if (file.type !== 'text/plain') {
-        showToast('Apenas arquivos de texto (.txt) são permitidos.', 'error');
-        return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        elements.transcriptionText.value = e.target.result;
-        showToast('Transcrição carregada com sucesso!');
-    };
-    reader.readAsText(file);
-}
-
-function savePlaybooks() {
-    try {
-        localStorage.setItem('playbooks', JSON.stringify(state.playbooks));
-    } catch (e) {
-        showToast('Erro: Armazenamento cheio. Remova alguns playbooks.', 'error');
-    }
-}
-
-function loadPlaybooks() {
-    const stored = localStorage.getItem('playbooks');
-    if (stored) {
-        state.playbooks = JSON.parse(stored);
-    }
-}
-
-function renderPlaybooks() {
-    elements.playbooksList.innerHTML = '';
-
-    if (state.playbooks.length === 0) {
-        elements.playbooksList.innerHTML = `
-            <div class="empty-state">
-                <p>Nenhum playbook cadastrado.</p>
-            </div>
-        `;
-        return;
-    }
-
-    state.playbooks.forEach(pb => {
-        const div = document.createElement('div');
-        div.className = 'playbook-item';
-        div.innerHTML = `
-            <div class="playbook-info">
-                <span class="icon">📄</span>
-                <span class="playbook-name">${pb.name}</span>
-            </div>
-            <button class="btn-delete" onclick="removePlaybook('${pb.id}')">
-                🗑️
-            </button>
-        `;
-        elements.playbooksList.appendChild(div);
-    });
-}
-
-window.removePlaybook = function (id) {
-    state.playbooks = state.playbooks.filter(pb => pb.id !== id);
-    savePlaybooks();
-    renderPlaybooks();
-    showToast('Playbook removido.');
-};
-
-// --- Analysis Logic ---
-function setupAnalysis() {
-    elements.btnAnalyze.addEventListener('click', runAnalysis);
-}
-
-async function runAnalysis() {
-    const transcription = elements.transcriptionText.value.trim();
-
-    if (!transcription) {
-        showToast('Por favor, insira a transcrição da reunião.', 'warning');
-        return;
-    }
-
-    setLoading(true);
-
-    try {
-        const result = await callGeminiAPI(transcription, state.playbooks);
-        state.analysisResult = result;
-        switchView('dashboard');
-        requestAnimationFrame(() => renderDashboard(result));
-        showToast('Análise concluída com sucesso!');
-    } catch (error) {
-        console.error('Erro na análise:', error);
-        showToast('Erro ao realizar a análise. Verifique o console.', 'error');
-    } finally {
-        setLoading(false);
-    }
-}
-
-async function callGeminiAPI(transcription, playbooks) {
-    // Construct the system prompt
-    let systemPrompt = `Você é um especialista em análise de reuniões de vendas e suporte. 
-    Analise a transcrição fornecida.
-    
-    Retorne APENAS um objeto JSON válido com a seguinte estrutura, sem markdown:
-    {
-        "meetingType": "Vendas/Consultoria/Suporte/Onboarding",
-        "objective": "objetivo principal em uma frase",
-        "duration": "duração estimada (ex: 30 min)",
-        "metrics": {
-            "Conhecimento Técnico": 0-100,
-            "Rapport": 0-100,
-            "Estratégia em Marketplaces": 0-100,
-            "Comunicação Clara": 0-100,
-            "Resolução de Problemas": 0-100
-        },
-        "feedback": [
-            {
-                "category": "nome da métrica relacionada",
-                "issue": "problema identificado",
-                "suggestion": "sugestão de melhoria",
-                "timestamp": "00:15:30 (aproximado)",
-                "severity": "warning" or "critical"
+            if (!response.ok) {
+                const errorData = await response.text();
+                throw new Error(`Erro na API: ${response.status} - ${errorData}`);
             }
-        ]
-    }`;
 
-    // Note: Using text-only request as requested by user to fix API error.
-    // Playbooks are not sent as binary to avoid complexity with the current model/request structure.
-    if (playbooks.length > 0) {
-        systemPrompt += `\n\nCONTEXTO: O usuário possui ${playbooks.length} playbooks cadastrados.`;
-    }
+            const data = await response.json();
+            let textResult = data.candidates[0].content.parts[0].text;
 
-    // API Call using the user's provided structure
-    const response = await fetch(`${API_URL}?key=${API_KEY}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            contents: [{
-                parts: [{ text: systemPrompt + "\n\nTRANSCRICÃO:\n" + transcription }]
-            }]
-        })
-    });
+            // Clean Markdown if present (Gemini sometimes adds ```json ... ```)
+            textResult = textResult.replace(/```json/g, '').replace(/```/g, '').trim();
 
-    if (!response.ok) {
-        const errorData = await response.text();
-        console.error('API Error Details:', response.status, errorData);
-        throw new Error(`Erro na API: ${response.status} - ${errorData}`);
-    }
+            const jsonResult = JSON.parse(textResult);
 
-    const data = await response.json();
-    let textResult = data.candidates[0].content.parts[0].text;
+            this.state.analysisResult = jsonResult;
 
-    // Clean Markdown if present
-    textResult = textResult.replace(/```json/g, '').replace(/```/g, '').trim();
+            // --- CORREÇÃO AQUI ---
+            // 1. Primeiro tornamos o dashboard visível para que o canvas tenha dimensões
+            this.navigate('dashboard');
 
-    return JSON.parse(textResult);
-}
+            // 2. Renderizamos o gráfico (agora que o canvas tem tamanho > 0)
+            // Usando um pequeno timeout para garantir que o reflow/layout ocorreu
+            setTimeout(() => {
+                this.renderDashboard(jsonResult);
+            }, 50);
 
-// --- Dashboard Rendering ---
-function renderDashboard(data) {
-    // Meta
-    elements.meetingType.textContent = `Tipo: ${data.meetingType}`;
-    elements.meetingDuration.textContent = `Duração: ${data.duration}`;
-    elements.meetingObjective.textContent = data.objective;
+            this.showToast('Análise concluída com sucesso!', 'success');
 
-    // Score
-    const metrics = Object.values(data.metrics);
-    const avgScore = Math.round(metrics.reduce((a, b) => a + b, 0) / metrics.length);
-    elements.overallScore.textContent = avgScore;
+        } catch (error) {
+            console.error(error);
+            this.showToast('Falha na análise. Verifique o console ou a API Key.', 'danger');
+        } finally {
+            btn.disabled = false;
+            btnText.textContent = 'Analisar com IA';
+            spinner.style.display = 'none';
+        }
+    },
 
-    // Chart
-    drawChart(data.metrics);
+    // --- DASHBOARD RENDERING ---
+    renderDashboard: function (data) {
+        // Texts
+        document.getElementById('res-type').textContent = data.meetingType;
+        document.getElementById('res-duration').textContent = data.duration;
+        document.getElementById('res-objective').textContent = data.objective;
 
-    // Feedback
-    renderFeedback(data.feedback);
-}
+        // Feedback List
+        const list = document.getElementById('feedback-container');
+        list.innerHTML = '';
 
-function renderFeedback(feedbackItems) {
-    elements.feedbackList.innerHTML = '';
+        if (data.feedback && data.feedback.length > 0) {
+            data.feedback.forEach(item => {
+                const el = document.createElement('div');
+                el.className = `feedback-item ${item.severity}`;
+                el.innerHTML = `
+                    <div class="feedback-header">
+                        <span style="font-weight: 600; color: var(--primary);">${item.category}</span>
+                        <span class="badge ${item.severity}">${item.severity}</span>
+                    </div>
+                    <p style="margin-bottom: 0.5rem;"><strong>Problema:</strong> ${item.issue}</p>
+                    <p style="color: var(--text-muted); font-size: 0.9rem;">👉 ${item.suggestion}</p>
+                    <div style="margin-top:0.5rem; font-size: 0.8rem; opacity: 0.7;">⏱ ${item.timestamp || 'N/A'}</div>
+                `;
+                list.appendChild(el);
+            });
+        } else {
+            list.innerHTML = '<p>Nenhum ponto crítico encontrado. Parabéns!</p>';
+        }
 
-    if (!feedbackItems || feedbackItems.length === 0) {
-        elements.feedbackList.innerHTML = '<div class="empty-state"><p>Nenhum ponto de melhoria crítico identificado.</p></div>';
-        return;
-    }
+        // Chart
+        this.drawRadarChart(data.metrics);
+    },
 
-    feedbackItems.forEach(item => {
-        const div = document.createElement('div');
-        div.className = `feedback-item ${item.severity}`;
-        div.innerHTML = `
-            <div class="feedback-header">
-                <span class="feedback-category">${item.category}</span>
-                <span class="feedback-timestamp">⏱ ${item.timestamp}</span>
-            </div>
-            <div class="feedback-issue">${item.issue}</div>
-            <div class="feedback-suggestion">💡 ${item.suggestion}</div>
-        `;
-        elements.feedbackList.appendChild(div);
-    });
-}
+    drawRadarChart: function (metricsObj) {
+        const canvas = document.getElementById('radarChart');
 
-// --- Chart Logic (Canvas API) ---
-function drawChart(metricsObj) {
-    const canvas = elements.metricsChart;
-    const ctx = canvas.getContext('2d');
+        // Safety check: ensure canvas exists
+        if (!canvas) return;
 
-    // Resize canvas for high DPI
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.parentElement.getBoundingClientRect();
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    ctx.scale(dpr, dpr);
+        const ctx = canvas.getContext('2d');
 
-    // Config
-    const labels = Object.keys(metricsObj);
-    const data = Object.values(metricsObj);
-    const count = labels.length;
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-    const radius = Math.min(centerX, centerY) - 40; // Padding
+        // High DPI scaling
+        const dpr = window.devicePixelRatio || 1;
+        const rect = canvas.getBoundingClientRect();
 
-    // Clear
-    ctx.clearRect(0, 0, rect.width, rect.height);
+        // Safety check: if element is hidden or has no size, stop drawing to prevent errors
+        if (rect.width === 0 || rect.height === 0) return;
 
-    // Draw Grid (Spider Web)
-    ctx.strokeStyle = '#334155';
-    ctx.lineWidth = 1;
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        ctx.scale(dpr, dpr);
+        // Fix CSS size
+        canvas.style.width = `${rect.width}px`;
+        canvas.style.height = `${rect.height}px`;
 
-    for (let i = 1; i <= 5; i++) {
+        const width = rect.width;
+        const height = rect.height;
+        const centerX = width / 2;
+        const centerY = height / 2;
+
+        // --- CORREÇÃO AQUI ---
+        // Ensure radius is never negative. If (min/2) < 40, set radius to 0 to avoid crash
+        const radius = Math.max(0, (Math.min(width, height) / 2) - 40);
+
+        // Data prep
+        const labels = Object.keys(metricsObj);
+        const values = Object.values(metricsObj);
+        const count = labels.length;
+        const angleStep = (Math.PI * 2) / count;
+
+        ctx.clearRect(0, 0, width, height);
+
+        // If radius is 0, we can't draw anything useful
+        if (radius <= 0) return;
+
+        // 1. Draw Grid (Pentagons)
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.lineWidth = 1;
+
+        for (let r = 0.2; r <= 1; r += 0.2) {
+            ctx.beginPath();
+            for (let i = 0; i < count; i++) {
+                const angle = i * angleStep - Math.PI / 2;
+                const x = centerX + Math.cos(angle) * (radius * r);
+                const y = centerY + Math.sin(angle) * (radius * r);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+            ctx.stroke();
+        }
+
+        // 2. Draw Axes
         ctx.beginPath();
-        const r = (radius / 5) * i;
-        for (let j = 0; j <= count; j++) {
-            const angle = (Math.PI * 2 * j) / count - Math.PI / 2;
-            const x = centerX + Math.cos(angle) * r;
-            const y = centerY + Math.sin(angle) * r;
-            if (j === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
+        for (let i = 0; i < count; i++) {
+            const angle = i * angleStep - Math.PI / 2;
+            const x = centerX + Math.cos(angle) * radius;
+            const y = centerY + Math.sin(angle) * radius;
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(x, y);
+
+            // Draw Labels
+            const labelX = centerX + Math.cos(angle) * (radius + 20);
+            const labelY = centerY + Math.sin(angle) * (radius + 20);
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = '10px Inter';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            // Split long labels
+            const words = labels[i].split(' ');
+            if (words.length > 1 && angle !== -Math.PI / 2) {
+                ctx.fillText(words[0], labelX, labelY - 6);
+                ctx.fillText(words.slice(1).join(' '), labelX, labelY + 6);
+            } else {
+                ctx.fillText(labels[i], labelX, labelY);
+            }
         }
         ctx.stroke();
+
+        // 3. Draw Data Area
+        ctx.beginPath();
+        values.forEach((val, i) => {
+            const normalized = val / 100;
+            const angle = i * angleStep - Math.PI / 2;
+            const x = centerX + Math.cos(angle) * (radius * normalized);
+            const y = centerY + Math.sin(angle) * (radius * normalized);
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        });
+        ctx.closePath();
+
+        // Gradient Fill
+        const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
+        gradient.addColorStop(0, 'rgba(99, 102, 241, 0.5)'); // Indigo
+        gradient.addColorStop(1, 'rgba(139, 92, 246, 0.1)'); // Purple
+
+        ctx.fillStyle = gradient;
+        ctx.fill();
+        ctx.strokeStyle = '#8b5cf6';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // 4. Draw Points
+        values.forEach((val, i) => {
+            const normalized = val / 100;
+            const angle = i * angleStep - Math.PI / 2;
+            const x = centerX + Math.cos(angle) * (radius * normalized);
+            const y = centerY + Math.sin(angle) * (radius * normalized);
+
+            ctx.beginPath();
+            ctx.arc(x, y, 4, 0, Math.PI * 2);
+            ctx.fillStyle = '#fff';
+            ctx.fill();
+        });
+    },
+
+    // --- UTILS ---
+    showToast: function (message, type = 'default') {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+
+        let icon = '';
+        if (type === 'success') icon = '✅';
+        if (type === 'warning') icon = '⚠️';
+        if (type === 'danger') icon = '❌';
+
+        toast.innerHTML = `<span>${icon}</span> <span>${message}</span>`;
+
+        if (type === 'danger') toast.style.borderColor = 'var(--danger)';
+        if (type === 'success') toast.style.borderColor = 'var(--success)';
+
+        container.appendChild(toast);
+
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateY(20px)';
+            setTimeout(() => toast.remove(), 300);
+        }, 4000);
     }
+};
 
-    // Draw Axes
-    ctx.beginPath();
-    for (let j = 0; j < count; j++) {
-        const angle = (Math.PI * 2 * j) / count - Math.PI / 2;
-        const x = centerX + Math.cos(angle) * radius;
-        const y = centerY + Math.sin(angle) * radius;
-        ctx.moveTo(centerX, centerY);
-        ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-
-    // Draw Data Area
-    ctx.beginPath();
-    ctx.fillStyle = 'rgba(99, 102, 241, 0.5)';
-    ctx.strokeStyle = '#8b5cf6';
-    ctx.lineWidth = 2;
-
-    for (let j = 0; j <= count; j++) {
-        const index = j % count;
-        const value = data[index];
-        const r = (radius * value) / 100;
-        const angle = (Math.PI * 2 * j) / count - Math.PI / 2;
-        const x = centerX + Math.cos(angle) * r;
-        const y = centerY + Math.sin(angle) * r;
-
-        if (j === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-    }
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
-    // Draw Labels
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = '12px Inter';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    for (let j = 0; j < count; j++) {
-        const angle = (Math.PI * 2 * j) / count - Math.PI / 2;
-        const labelRadius = radius + 20;
-        const x = centerX + Math.cos(angle) * labelRadius;
-        const y = centerY + Math.sin(angle) * labelRadius;
-
-        // Split long labels
-        const words = labels[j].split(' ');
-        if (words.length > 1) {
-            ctx.fillText(words[0], x, y - 7);
-            ctx.fillText(words.slice(1).join(' '), x, y + 7);
-        } else {
-            ctx.fillText(labels[j], x, y);
-        }
-    }
-}
-
-// --- Utilities ---
-function fileToBase64(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = error => reject(error);
-    });
-}
-
-function setLoading(isLoading) {
-    state.isAnalyzing = isLoading;
-    if (isLoading) {
-        elements.btnAnalyze.disabled = true;
-        elements.spinner.classList.remove('hidden');
-        elements.btnText.textContent = 'Analisando...';
-    } else {
-        elements.btnAnalyze.disabled = false;
-        elements.spinner.classList.add('hidden');
-        elements.btnText.textContent = 'Iniciar Análise';
-    }
-}
-
-function showToast(message, type = 'success') {
-    const toast = elements.toast;
-    toast.textContent = message;
-    toast.className = `toast ${type}`; // Reset classes
-    toast.classList.remove('hidden');
-
-    if (type === 'error') toast.style.borderLeft = '4px solid #ef4444';
-    else if (type === 'warning') toast.style.borderLeft = '4px solid #f59e0b';
-    else toast.style.borderLeft = '4px solid #10b981';
-
-    setTimeout(() => {
-        toast.classList.add('hidden');
-    }, 3000);
-}
-
-// Start
-document.addEventListener('DOMContentLoaded', init);
-
-
+// Initialize App
+document.addEventListener('DOMContentLoaded', () => {
+    app.init();
+});
