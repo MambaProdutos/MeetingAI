@@ -5,7 +5,8 @@
 
 // --- Configuration ---
 const API_KEY = 'AIzaSyC987HTopzfXyzf0v948gAOB8lBlP_9_jc';
-const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent';
+// Using gemini-pro as it is the standard stable model
+const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
 
 // --- State Management ---
 const state = {
@@ -157,8 +158,6 @@ function handleTranscriptionFile(files) {
 }
 
 function savePlaybooks() {
-    // In a real app, we might hit storage limits with Base64 PDFs in LocalStorage.
-    // For this prototype, we'll try, but handle errors.
     try {
         localStorage.setItem('playbooks', JSON.stringify(state.playbooks));
     } catch (e) {
@@ -201,7 +200,6 @@ function renderPlaybooks() {
     });
 }
 
-// Global scope for onclick handler
 window.removePlaybook = function (id) {
     state.playbooks = state.playbooks.filter(pb => pb.id !== id);
     savePlaybooks();
@@ -222,17 +220,12 @@ async function runAnalysis() {
         return;
     }
 
-    if (state.playbooks.length === 0) {
-        showToast('Aviso: Nenhum playbook cadastrado. A análise será genérica.', 'warning');
-    }
-
     setLoading(true);
 
     try {
         const result = await callGeminiAPI(transcription, state.playbooks);
         state.analysisResult = result;
         switchView('dashboard');
-        // Small delay to ensure layout update (though usually synchronous)
         requestAnimationFrame(() => renderDashboard(result));
         showToast('Análise concluída com sucesso!');
     } catch (error) {
@@ -244,77 +237,63 @@ async function runAnalysis() {
 }
 
 async function callGeminiAPI(transcription, playbooks) {
-    // Construct the parts for the API
-    const parts = [];
-
-    // 1. System Prompt
-    parts.push({
-        text: `Você é um especialista em análise de reuniões de vendas e suporte. 
-        Analise a transcrição fornecida com base nos playbooks anexados (se houver).
-        
-        Retorne APENAS um objeto JSON válido com a seguinte estrutura, sem markdown:
-        {
-            "meetingType": "Vendas/Consultoria/Suporte/Onboarding",
-            "objective": "objetivo principal em uma frase",
-            "duration": "duração estimada (ex: 30 min)",
-            "metrics": {
-                "Conhecimento Técnico": 0-100,
-                "Rapport": 0-100,
-                "Estratégia em Marketplaces": 0-100,
-                "Comunicação Clara": 0-100,
-                "Resolução de Problemas": 0-100
-            },
-            "feedback": [
-                {
-                    "category": "nome da métrica relacionada",
-                    "issue": "problema identificado",
-                    "suggestion": "sugestão com referência ao playbook",
-                    "timestamp": "00:15:30 (aproximado)",
-                    "severity": "warning" or "critical"
-                }
-            ]
-        }`
-    });
-
-    // 2. Add Playbooks as inline data
-    playbooks.forEach(pb => {
-        // Remove data URL prefix if present (e.g., "data:application/pdf;base64,")
-        const base64Data = pb.content.split(',')[1];
-        parts.push({
-            inline_data: {
-                mime_type: pb.type,
-                data: base64Data
+    // Construct the system prompt
+    let systemPrompt = `Você é um especialista em análise de reuniões de vendas e suporte. 
+    Analise a transcrição fornecida.
+    
+    Retorne APENAS um objeto JSON válido com a seguinte estrutura, sem markdown:
+    {
+        "meetingType": "Vendas/Consultoria/Suporte/Onboarding",
+        "objective": "objetivo principal em uma frase",
+        "duration": "duração estimada (ex: 30 min)",
+        "metrics": {
+            "Conhecimento Técnico": 0-100,
+            "Rapport": 0-100,
+            "Estratégia em Marketplaces": 0-100,
+            "Comunicação Clara": 0-100,
+            "Resolução de Problemas": 0-100
+        },
+        "feedback": [
+            {
+                "category": "nome da métrica relacionada",
+                "issue": "problema identificado",
+                "suggestion": "sugestão de melhoria",
+                "timestamp": "00:15:30 (aproximado)",
+                "severity": "warning" or "critical"
             }
-        });
-    });
+        ]
+    }`;
 
-    // 3. Add Transcription
-    parts.push({
-        text: `TRANSCRICAO DA REUNIAO:\n${transcription}`
-    });
+    // Note: Using text-only request as requested by user to fix API error.
+    // Playbooks are not sent as binary to avoid complexity with the current model/request structure.
+    if (playbooks.length > 0) {
+        systemPrompt += `\n\nCONTEXTO: O usuário possui ${playbooks.length} playbooks cadastrados.`;
+    }
 
+    // API Call using the user's provided structure
     const response = await fetch(`${API_URL}?key=${API_KEY}`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            contents: [{ parts: parts }]
+            contents: [{
+                parts: [{ text: systemPrompt + "\n\nTRANSCRICÃO:\n" + transcription }]
+            }]
         })
     });
 
     if (!response.ok) {
-        const errorBody = await response.text();
-        console.error('API Error Details:', response.status, errorBody);
-        throw new Error(`API Error: ${response.status} - ${errorBody}`);
+        const errorData = await response.text();
+        console.error('API Error Details:', response.status, errorData);
+        throw new Error(`Erro na API: ${response.status} - ${errorData}`);
     }
 
     const data = await response.json();
-    const textResponse = data.candidates[0].content.parts[0].text;
+    let textResult = data.candidates[0].content.parts[0].text;
 
-    // Clean markdown if present
-    const jsonString = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
-    return JSON.parse(jsonString);
+    // Clean Markdown if present
+    textResult = textResult.replace(/```json/g, '').replace(/```/g, '').trim();
+
+    return JSON.parse(textResult);
 }
 
 // --- Dashboard Rendering ---
