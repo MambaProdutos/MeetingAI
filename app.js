@@ -1,227 +1,585 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
+/**
+ * APP LOGIC
+ * Vanilla JS - Single File Structure
+ */
+const app = {
+    // State
+    state: {
+        currentView: 'upload',
+        playbooks: [], // Stores { name: string, date: string }
+        analyses: [], // Stores { id, collaborator, meetingName, date, score, result }
+        analysisResult: null
+    },
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Meeting AI - Análise de Reuniões</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css">
-</head>
+    // Configuration
+    config: {
+        // ATENÇÃO: Ao fazer deploy público, restrinja esta chave no Google Cloud Console para o domínio do seu site.
+        apiKey: 'AIzaSyBR2I9CnBnwWcuvfkodkCBtAC76TMg08ok',
+        apiUrl: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent'
+    },
 
-<body>
-    <div class="app-container">
-        <!-- SIDEBAR -->
-        <nav class="sidebar">
-            <div class="brand">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path
-                        d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
-                    </path>
-                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-                    <line x1="12" y1="22.08" x2="12" y2="12"></line>
-                </svg>
-                <span>MeetingAI</span>
-            </div>
+    // Initialization
+    init: function () {
+        this.loadPlaybooks();
+        this.loadAnalyses();
+        this.setupNavigation();
+        this.setupDragDrop();
+        this.navigate('upload');
+    },
 
-            <div class="nav-menu">
-                <div class="nav-item" onclick="app.navigate('upload')">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="17 8 12 3 7 8"></polyline>
-                        <line x1="12" y1="3" x2="12" y2="15"></line>
-                    </svg>
-                    <span class="nav-text">Nova Análise</span>
-                </div>
-                <div class="nav-item" onclick="app.navigate('playbooks')">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                        <polyline points="14 2 14 8 20 8"></polyline>
-                        <line x1="16" y1="13" x2="8" y2="13"></line>
-                        <line x1="16" y1="17" x2="8" y2="17"></line>
-                        <polyline points="10 9 9 9 8 9"></polyline>
-                    </svg>
-                    <span class="nav-text">Playbooks</span>
-                </div>
-                <div class="nav-item" onclick="app.navigate('dashboard')">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="3" y="3" width="7" height="7"></rect>
-                        <rect x="14" y="3" width="7" height="7"></rect>
-                        <rect x="14" y="14" width="7" height="7"></rect>
-                        <rect x="3" y="14" width="7" height="7"></rect>
-                    </svg>
-                    <span class="nav-text">Dashboard</span>
-                </div>
-                <div class="nav-item" onclick="app.navigate('collaborators')">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                        <circle cx="9" cy="7" r="4"></circle>
-                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                    </svg>
-                    <span class="nav-text">Colaboradores</span>
-                </div>
-            </div>
-        </nav>
+    // --- NAVIGATION ---
+    navigate: function (viewId) {
+        // Update State
+        this.state.currentView = viewId;
 
-        <!-- MAIN CONTENT -->
-        <main class="main-content">
-            <!-- VIEW: UPLOAD/NEW ANALYSIS -->
-            <section id="view-upload" class="view-section active">
-                <h1>Nova Análise</h1>
-                <p class="subtitle">Cole a transcrição da reunião para receber insights baseados nos seus playbooks.</p>
+        // UI Updates
+        document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+        document.getElementById(`view-${viewId}`).classList.add('active');
 
-                <div class="card">
-                    <div class="input-row" style="display: flex; gap: 1rem; margin-bottom: 1rem;">
-                        <div class="input-group" style="flex: 1; margin-bottom: 0;">
-                            <label>Nome do Colaborador</label>
-                            <input type="text" id="collaborator-name" placeholder="Ex: João Silva" class="text-input">
-                        </div>
-                        <div class="input-group" style="flex: 1; margin-bottom: 0;">
-                            <label>Nome da Reunião</label>
-                            <input type="text" id="meeting-name" placeholder="Ex: Reunião de Vendas - Cliente X"
-                                class="text-input">
-                        </div>
-                    </div>
+        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
 
-                    <div class="input-group">
-                        <label>Transcrição da Reunião</label>
-                        <textarea id="transcript-input"
-                            placeholder="Cole o texto aqui (Ex: Vendedor: Olá, tudo bem? Cliente: Tudo ótimo...)"></textarea>
-                    </div>
+        // Find index based on viewId simple mapping
+        let navIndex = -1;
+        if (viewId === 'upload') navIndex = 0;
+        else if (viewId === 'playbooks') navIndex = 1;
+        else if (viewId === 'dashboard') navIndex = 2;
+        else if (viewId === 'collaborators' || viewId === 'collaborator-detail') navIndex = 3; // New menu item
 
-                    <div class="input-group">
-                        <label>Ou faça upload de um arquivo de texto (.txt)</label>
-                        <input type="file" id="transcript-file" accept=".txt" onchange="app.handleTranscriptFile(this)">
-                    </div>
+        if (navIndex >= 0) {
+            const navItem = document.querySelectorAll('.nav-item')[navIndex];
+            if (navItem) navItem.classList.add('active');
+        }
 
-                    <button id="btn-analyze" class="btn" onclick="app.runAnalysis()">
-                        <span class="btn-text">Analisar com IA</span>
-                        <div class="spinner" style="display: none;"></div>
-                    </button>
-                </div>
+        // View specific logic
+        if (viewId === 'collaborators') {
+            this.renderCollaboratorsList();
+        }
+    },
 
-                <div class="card" style="border-left: 4px solid var(--primary);">
-                    <h4>💡 Dica</h4>
-                    <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.5rem;">
-                        Certifique-se de que seus Playbooks estão cadastrados na aba "Playbooks" para uma análise mais
-                        precisa.
-                    </p>
-                </div>
-            </section>
+    setupNavigation: function () {
+        // Done via onclick in HTML for simplicity
+    },
 
-            <!-- VIEW: PLAYBOOKS -->
-            <section id="view-playbooks" class="view-section">
-                <h1>Gerenciar Playbooks</h1>
-                <p class="subtitle">Faça upload dos seus guias de vendas e metodologias (PDF).</p>
+    // --- DATA MANAGEMENT ---
+    loadPlaybooks: function () {
+        const stored = localStorage.getItem('meeting_ai_playbooks');
+        if (stored) {
+            this.state.playbooks = JSON.parse(stored);
+            this.renderPlaybooks();
+        }
+    },
 
-                <div class="upload-zone" id="drop-zone">
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"
-                        style="color: var(--primary); margin-bottom: 1rem;">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="17 8 12 3 7 8"></polyline>
-                        <line x1="12" y1="3" x2="12" y2="15"></line>
-                    </svg>
-                    <p>Arraste e solte seus PDFs aqui ou <span style="color: var(--primary); font-weight: 600;">clique
-                            para buscar</span></p>
-                    <input type="file" id="playbook-input" accept="application/pdf" multiple style="display: none;">
-                </div>
+    savePlaybooks: function () {
+        localStorage.setItem('meeting_ai_playbooks', JSON.stringify(this.state.playbooks));
+        this.renderPlaybooks();
+    },
 
-                <h3 style="margin-top: 2rem; margin-bottom: 1rem;">Playbooks Ativos</h3>
-                <div id="playbook-list" class="file-list">
-                    <!-- Files will be injected here -->
-                </div>
-            </section>
+    loadAnalyses: function () {
+        const stored = localStorage.getItem('meeting_ai_analyses');
+        if (stored) {
+            this.state.analyses = JSON.parse(stored);
+        }
+    },
 
-            <!-- VIEW: DASHBOARD -->
-            <section id="view-dashboard" class="view-section">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                    <h1>Resultados da Análise</h1>
-                    <button class="btn btn-outline" onclick="app.navigate('upload')">Nova Análise</button>
-                </div>
+    saveAnalyses: function () {
+        localStorage.setItem('meeting_ai_analyses', JSON.stringify(this.state.analyses));
+    },
 
-                <!-- Score Header -->
-                <div class="card"
-                    style="background: linear-gradient(90deg, rgba(99, 102, 241, 0.1) 0%, transparent 100%); border-left: 4px solid var(--primary);">
-                    <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
-                        <div>
-                            <span style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Tipo
-                                de Reunião</span>
-                            <h3 id="res-type">---</h3>
-                        </div>
-                        <div>
-                            <span
-                                style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Duração
-                                Estimada</span>
-                            <h3 id="res-duration">---</h3>
-                        </div>
-                        <div>
-                            <span
-                                style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Objetivo</span>
-                            <h3 id="res-objective" style="font-size: 1rem; max-width: 400px;">---</h3>
-                        </div>
+    // --- PLAYBOOK ACTIONS ---
+    addPlaybook: function (file) {
+        // Validate duplicate
+        if (this.state.playbooks.some(p => p.name === file.name)) {
+            this.showToast(`O playbook "${file.name}" já existe.`, 'warning');
+            return;
+        }
+
+        // Add metadata only (Browser cannot easily store full PDF content in localStorage due to 5MB limit)
+        this.state.playbooks.push({
+            name: file.name,
+            date: new Date().toLocaleDateString(),
+            size: (file.size / 1024).toFixed(1) + ' KB'
+        });
+
+        this.savePlaybooks();
+        this.showToast('Playbook adicionado com sucesso!', 'success');
+    },
+
+    removePlaybook: function (index) {
+        this.state.playbooks.splice(index, 1);
+        this.savePlaybooks();
+        this.showToast('Playbook removido.', 'default');
+    },
+
+    renderPlaybooks: function () {
+        const list = document.getElementById('playbook-list');
+        list.innerHTML = '';
+
+        if (this.state.playbooks.length === 0) {
+            list.innerHTML = '<p style="color: var(--text-muted); grid-column: 1/-1; text-align: center;">Nenhum playbook cadastrado.</p>';
+            return;
+        }
+
+        this.state.playbooks.forEach((pb, index) => {
+            const el = document.createElement('div');
+            el.className = 'file-card';
+            el.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 0.8rem; overflow: hidden;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                    <div style="overflow: hidden;">
+                        <div style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${pb.name}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">${pb.date} • ${pb.size}</div>
                     </div>
                 </div>
+                <div class="delete-btn" onclick="app.removePlaybook(${index})">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </div>
+            `;
+            list.appendChild(el);
+        });
+    },
 
-                <div class="dashboard-grid">
-                    <!-- Chart Column -->
-                    <div class="card">
-                        <h4 style="margin-bottom: 1rem; text-align: center;">Performance Multidimensional</h4>
-                        <div class="chart-container">
-                            <canvas id="radarChart" width="300" height="300"></canvas>
-                        </div>
+    setupDragDrop: function () {
+        const dropZone = document.getElementById('drop-zone');
+        const input = document.getElementById('playbook-input');
+
+        dropZone.addEventListener('click', () => input.click());
+
+        input.addEventListener('change', (e) => {
+            Array.from(e.target.files).forEach(file => this.addPlaybook(file));
+            input.value = ''; // Reset
+        });
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            Array.from(files).forEach(file => {
+                if (file.type === 'application/pdf') {
+                    this.addPlaybook(file);
+                } else {
+                    this.showToast('Apenas arquivos PDF são permitidos.', 'danger');
+                }
+            });
+        });
+    },
+
+    handleTranscriptFile: function (input) {
+        const file = input.files[0];
+        if (!file) return;
+
+        // Auto-fill meeting name from filename
+        const meetingNameInput = document.getElementById('meeting-name');
+        if (meetingNameInput && !meetingNameInput.value) {
+            meetingNameInput.value = file.name.replace(/\.[^/.]+$/, ""); // Remove extension
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            document.getElementById('transcript-input').value = e.target.result;
+            this.showToast('Transcrição carregada!', 'success');
+        };
+        reader.readAsText(file);
+    },
+
+    // --- GEMINI ANALYSIS LOGIC ---
+    runAnalysis: async function () {
+        const transcript = document.getElementById('transcript-input').value.trim();
+        const collaborator = document.getElementById('collaborator-name').value.trim() || 'Desconhecido';
+        const meetingName = document.getElementById('meeting-name').value.trim() || `Reunião ${new Date().toLocaleDateString()}`;
+
+        // Validations
+        if (!transcript) {
+            this.showToast('Por favor, insira uma transcrição.', 'warning');
+            return;
+        }
+
+        if (transcript.length < 50) {
+            this.showToast('Transcrição muito curta para análise.', 'warning');
+            return;
+        }
+
+        // UI Loading
+        const btn = document.getElementById('btn-analyze');
+        const btnText = btn.querySelector('.btn-text');
+        const spinner = btn.querySelector('.spinner');
+
+        btn.disabled = true;
+        btnText.textContent = 'Analisando...';
+        spinner.style.display = 'block';
+
+        try {
+            // Construct Prompt
+            const playbooksList = this.state.playbooks.map(p => p.name).join(', ');
+            const systemPrompt = `
+                Você é um especialista em análise de reuniões e coaching de vendas.
+                Analise a transcrição abaixo.
+                
+                Contexto dos Playbooks Ativos (considere as melhores práticas inferidas pelos títulos): ${playbooksList || "Nenhum playbook específico, use boas práticas gerais de vendas."}
+
+                Retorne APENAS um objeto JSON válido (sem markdown, sem code blocks) com a seguinte estrutura:
+                {
+                    "meetingType": "String (ex: Vendas, Suporte, Onboarding)",
+                    "objective": "Resumo de 1 frase",
+                    "duration": "Estimativa baseada no texto (ex: 30 min)",
+                    "overallScore": 0-100 (Nota geral de qualidade da reunião),
+                    "metrics": {
+                        "Conhecimento Técnico": 0-100,
+                        "Rapport": 0-100,
+                        "Estratégia em Marketplaces": 0-100,
+                        "Comunicação Clara": 0-100,
+                        "Resolução de Problemas": 0-100
+                    },
+                    "feedback": [
+                        {
+                            "category": "Nome da métrica relacionada",
+                            "issue": "O que foi feito errado ou poderia melhorar",
+                            "suggestion": "Sugestão acionável",
+                            "timestamp": "Momento aproximado (ex: Começo, Meio ou HH:MM:SS)",
+                            "severity": "warning ou critical"
+                        }
+                    ]
+                }
+            `;
+
+            // API Call
+            const response = await fetch(`${this.config.apiUrl}?key=${this.config.apiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [{ text: systemPrompt + "\n\nTRANSCRICÃO:\n" + transcript }]
+                    }]
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.text();
+                throw new Error(`Erro na API: ${response.status} - ${errorData}`);
+            }
+
+            const data = await response.json();
+            let textResult = data.candidates[0].content.parts[0].text;
+
+            // Clean Markdown if present (Gemini sometimes adds ```json ... ```)
+            textResult = textResult.replace(/```json/g, '').replace(/```/g, '').trim();
+
+            const jsonResult = JSON.parse(textResult);
+
+            // Save Analysis
+            const newAnalysis = {
+                id: Date.now().toString(),
+                collaborator: collaborator,
+                meetingName: meetingName,
+                date: new Date().toLocaleDateString(),
+                score: jsonResult.overallScore || 0,
+                result: jsonResult
+            };
+
+            this.state.analyses.unshift(newAnalysis); // Add to beginning
+            this.saveAnalyses();
+            this.state.analysisResult = jsonResult;
+
+            // Navigate to Dashboard
+            this.navigate('dashboard');
+
+            // Render Chart
+            setTimeout(() => {
+                this.renderDashboard(jsonResult);
+            }, 50);
+
+            this.showToast('Análise concluída e salva!', 'success');
+
+        } catch (error) {
+            console.error(error);
+            this.showToast('Falha na análise. Verifique o console ou a API Key.', 'danger');
+        } finally {
+            btn.disabled = false;
+            btnText.textContent = 'Analisar com IA';
+            spinner.style.display = 'none';
+        }
+    },
+
+    // --- DASHBOARD RENDERING ---
+    renderDashboard: function (data) {
+        // Texts
+        document.getElementById('res-type').textContent = data.meetingType;
+        document.getElementById('res-duration').textContent = data.duration;
+        document.getElementById('res-objective').textContent = data.objective;
+
+        // Feedback List
+        const list = document.getElementById('feedback-container');
+        list.innerHTML = '';
+
+        if (data.feedback && data.feedback.length > 0) {
+            data.feedback.forEach(item => {
+                const el = document.createElement('div');
+                el.className = `feedback-item ${item.severity}`;
+                el.innerHTML = `
+                    <div class="feedback-header">
+                        <span style="font-weight: 600; color: var(--primary);">${item.category}</span>
+                        <span class="badge ${item.severity}">${item.severity}</span>
                     </div>
+                    <p style="margin-bottom: 0.5rem;"><strong>Problema:</strong> ${item.issue}</p>
+                    <p style="color: var(--text-muted); font-size: 0.9rem;">👉 ${item.suggestion}</p>
+                    <div style="margin-top:0.5rem; font-size: 0.8rem; opacity: 0.7;">⏱ ${item.timestamp || 'N/A'}</div>
+                `;
+                list.appendChild(el);
+            });
+        } else {
+            list.innerHTML = '<p>Nenhum ponto crítico encontrado. Parabéns!</p>';
+        }
 
-                    <!-- Metrics & Feedback Column -->
-                    <div>
-                        <div class="card">
-                            <h4 style="margin-bottom: 1rem;">Pontos de Atenção & Sugestões</h4>
-                            <div id="feedback-container" class="feedback-list">
-                                <p style="color: var(--text-muted); text-align: center; padding: 2rem;">Nenhuma análise
-                                    realizada ainda.</p>
-                            </div>
-                        </div>
+        // Chart
+        this.drawRadarChart(data.metrics);
+    },
+
+    drawRadarChart: function (metricsObj) {
+        const canvas = document.getElementById('radarChart');
+
+        // Safety check: ensure canvas exists
+        if (!canvas) return;
+
+        const ctx = canvas.getContext('2d');
+
+        // High DPI scaling
+        const dpr = window.devicePixelRatio || 1;
+        const rect = canvas.getBoundingClientRect();
+
+        // Safety check: if element is hidden or has no size, stop drawing to prevent errors
+        if (rect.width === 0 || rect.height === 0) return;
+
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        ctx.scale(dpr, dpr);
+        // Fix CSS size
+        canvas.style.width = `${rect.width}px`;
+        canvas.style.height = `${rect.height}px`;
+
+        const width = rect.width;
+        const height = rect.height;
+        const centerX = width / 2;
+        const centerY = height / 2;
+
+        // Ensure radius is never negative. If (min/2) < 40, set radius to 0 to avoid crash
+        const radius = Math.max(0, (Math.min(width, height) / 2) - 40);
+
+        // Data prep
+        const labels = Object.keys(metricsObj);
+        const values = Object.values(metricsObj);
+        const count = labels.length;
+        const angleStep = (Math.PI * 2) / count;
+
+        ctx.clearRect(0, 0, width, height);
+
+        // If radius is 0, we can't draw anything useful
+        if (radius <= 0) return;
+
+        // 1. Draw Grid (Pentagons)
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.lineWidth = 1;
+
+        for (let r = 0.2; r <= 1; r += 0.2) {
+            ctx.beginPath();
+            for (let i = 0; i < count; i++) {
+                const angle = i * angleStep - Math.PI / 2;
+                const x = centerX + Math.cos(angle) * (radius * r);
+                const y = centerY + Math.sin(angle) * (radius * r);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+            ctx.stroke();
+        }
+
+        // 2. Draw Axes
+        ctx.beginPath();
+        for (let i = 0; i < count; i++) {
+            const angle = i * angleStep - Math.PI / 2;
+            const x = centerX + Math.cos(angle) * radius;
+            const y = centerY + Math.sin(angle) * radius;
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(x, y);
+
+            // Draw Labels
+            const labelX = centerX + Math.cos(angle) * (radius + 20);
+            const labelY = centerY + Math.sin(angle) * (radius + 20);
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = '10px Inter';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            // Split long labels
+            const words = labels[i].split(' ');
+            if (words.length > 1 && angle !== -Math.PI / 2) {
+                ctx.fillText(words[0], labelX, labelY - 6);
+                ctx.fillText(words.slice(1).join(' '), labelX, labelY + 6);
+            } else {
+                ctx.fillText(labels[i], labelX, labelY);
+            }
+        }
+        ctx.stroke();
+
+        // 3. Draw Data Area
+        ctx.beginPath();
+        values.forEach((val, i) => {
+            const normalized = val / 100;
+            const angle = i * angleStep - Math.PI / 2;
+            const x = centerX + Math.cos(angle) * (radius * normalized);
+            const y = centerY + Math.sin(angle) * (radius * normalized);
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        });
+        ctx.closePath();
+
+        // Gradient Fill
+        const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
+        gradient.addColorStop(0, 'rgba(99, 102, 241, 0.5)'); // Indigo
+        gradient.addColorStop(1, 'rgba(139, 92, 246, 0.1)'); // Purple
+
+        ctx.fillStyle = gradient;
+        ctx.fill();
+        ctx.strokeStyle = '#8b5cf6';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // 4. Draw Points
+        values.forEach((val, i) => {
+            const normalized = val / 100;
+            const angle = i * angleStep - Math.PI / 2;
+            const x = centerX + Math.cos(angle) * (radius * normalized);
+            const y = centerY + Math.sin(angle) * (radius * normalized);
+
+            ctx.beginPath();
+            ctx.arc(x, y, 4, 0, Math.PI * 2);
+            ctx.fillStyle = '#fff';
+            ctx.fill();
+        });
+    },
+
+    // --- COLLABORATORS VIEWS ---
+    renderCollaboratorsList: function () {
+        const list = document.getElementById('collaborators-list');
+        list.innerHTML = '';
+
+        // Group by collaborator
+        const grouped = {};
+        this.state.analyses.forEach(a => {
+            const name = a.collaborator;
+            if (!grouped[name]) grouped[name] = [];
+            grouped[name].push(a);
+        });
+
+        const names = Object.keys(grouped).sort();
+
+        if (names.length === 0) {
+            list.innerHTML = '<p style="color: var(--text-muted); grid-column: 1/-1; text-align: center;">Nenhum histórico encontrado.</p>';
+            return;
+        }
+
+        names.forEach(name => {
+            const count = grouped[name].length;
+            // Calculate average score
+            const avgScore = Math.round(grouped[name].reduce((sum, a) => sum + (a.score || 0), 0) / count);
+
+            const el = document.createElement('div');
+            el.className = 'collaborator-card';
+            el.onclick = () => this.openCollaboratorDetail(name);
+            el.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="margin: 0;">${name}</h3>
+                    <div class="score-badge ${this.getScoreClass(avgScore)}">${avgScore}</div>
+                </div>
+                <div style="color: var(--text-muted); font-size: 0.9rem;">
+                    ${count} reuniões analisadas
+                </div>
+            `;
+            list.appendChild(el);
+        });
+    },
+
+    openCollaboratorDetail: function (name) {
+        document.getElementById('detail-collaborator-name').textContent = name;
+        this.navigate('collaborator-detail');
+
+        const list = document.getElementById('collaborator-meetings-list');
+        list.innerHTML = '';
+
+        const meetings = this.state.analyses.filter(a => a.collaborator === name);
+
+        meetings.forEach(meeting => {
+            const el = document.createElement('div');
+            el.className = 'meeting-card';
+            el.onclick = () => this.loadAnalysisToDashboard(meeting);
+            el.innerHTML = `
+                <div>
+                    <div style="font-weight: 600; margin-bottom: 0.2rem;">${meeting.meetingName}</div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted);">
+                        ${meeting.date} • ${meeting.result.meetingType}
                     </div>
                 </div>
-            </section>
+                <div class="score-badge ${this.getScoreClass(meeting.score)}">${meeting.score || 0}</div>
+            `;
+            list.appendChild(el);
+        });
+    },
 
-            <!-- VIEW: COLLABORATORS LIST -->
-            <section id="view-collaborators" class="view-section">
-                <h1>Colaboradores</h1>
-                <p class="subtitle">Histórico de análises por membro da equipe.</p>
+    loadAnalysisToDashboard: function (analysis) {
+        this.state.analysisResult = analysis.result;
+        this.navigate('dashboard');
+        setTimeout(() => {
+            this.renderDashboard(analysis.result);
+        }, 50);
+    },
 
-                <div id="collaborators-list" class="file-list">
-                    <!-- Collaborator cards injected here -->
-                </div>
-            </section>
+    getScoreClass: function (score) {
+        if (score >= 80) return 'score-high';
+        if (score >= 50) return 'score-mid';
+        return 'score-low';
+    },
 
-            <!-- VIEW: COLLABORATOR DETAIL -->
-            <section id="view-collaborator-detail" class="view-section">
-                <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
-                    <button class="btn-outline" onclick="app.navigate('collaborators')" style="padding: 0.5rem;">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <polyline points="15 18 9 12 15 6"></polyline>
-                        </svg>
-                    </button>
-                    <h1 id="detail-collaborator-name" style="margin-bottom: 0;">Nome do Colaborador</h1>
-                </div>
-                <p class="subtitle">Histórico de reuniões analisadas.</p>
+    // --- UTILS ---
+    showToast: function (message, type = 'default') {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = 'toast';
 
-                <div id="collaborator-meetings-list" class="file-list">
-                    <!-- Meeting cards injected here -->
-                </div>
-            </section>
+        let icon = '';
+        if (type === 'success') icon = '✅';
+        if (type === 'warning') icon = '⚠️';
+        if (type === 'danger') icon = '❌';
 
-        </main>
-    </div>
+        toast.innerHTML = `<span>${icon}</span> <span>${message}</span>`;
 
-    <!-- TOAST CONTAINER -->
-    <div id="toast-container"></div>
+        if (type === 'danger') toast.style.borderColor = 'var(--danger)';
+        if (type === 'success') toast.style.borderColor = 'var(--success)';
 
-    <script src="app.js"></script>
-</body>
+        container.appendChild(toast);
 
-</html>
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateY(20px)';
+            setTimeout(() => toast.remove(), 300);
+        }, 4000);
+    }
+};
+
+// Initialize App
+document.addEventListener('DOMContentLoaded', () => {
+    app.init();
+});
