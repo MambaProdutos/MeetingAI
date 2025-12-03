@@ -413,3 +413,62 @@ textarea {
         padding: 1rem;
     }
 }
+
+/* --- NEW INPUT STYLES --- */
+.text-input {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.8rem 1rem;
+    color: var(--text-main);
+    font-family: var(--font-main);
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+}
+
+.text-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    background: rgba(0, 0, 0, 0.3);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+.text-input::placeholder {
+    color: rgba(148, 163, 184, 0.5);
+}
+
+/* Custom File Input Styling */
+input[type="file"] {
+    width: 100%;
+    padding: 0.8rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: all 0.3s ease;
+}
+
+input[type="file"]:hover {
+    border-color: var(--primary);
+    background: rgba(99, 102, 241, 0.05);
+}
+
+input[type="file"]::-webkit-file-upload-button {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    margin-right: 1rem;
+    cursor: pointer;
+    font-family: var(--font-main);
+    font-weight: 500;
+    transition: transform 0.2s;
+}
+
+input[type="file"]::-webkit-file-upload-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+}
