@@ -133,6 +133,51 @@
                 <div id="playbook-list" class="file-list"></div>
             </section>
 
+            <!-- VIEW: DASHBOARD -->
+            <section id="view-dashboard" class="view-section">
+                <div class="dashboard-container">
+                    <div class="dashboard-top">
+                        <div class="chart-wrapper">
+                            <canvas id="radarChart"></canvas>
+                        </div>
+                        <div class="score-overview">
+                            <div class="score-display">
+                                <div class="score-label">Nota Geral da Reunião</div>
+                                <div id="total-score-display">0</div>
+                            </div>
+                            <div class="score-bar-container">
+                                <div id="score-progress-bar" class="score-progress-bar"></div>
+                            </div>
+                            <div class="meeting-meta">
+                                <p>Tipo: <span id="res-type">-</span></p>
+                                <p>Duração: <span id="res-duration">-</span></p>
+                                <p>Objetivo: <span id="res-objective">-</span></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="metrics-breakdown" class="metrics-grid">
+                        <!-- Metrics will be injected here -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW: COLLABORATORS -->
+            <section id="view-collaborators" class="view-section">
+                <h1>Colaboradores</h1>
+                <div id="collaborators-list" class="file-list"></div>
+            </section>
+
+            <!-- VIEW: COLLABORATOR DETAIL -->
+            <section id="view-collaborator-detail" class="view-section">
+                <div class="breadcrumb">
+                    <span class="breadcrumb-link" onclick="app.navigate('collaborators')">Colaboradores</span>
+                    <span class="breadcrumb-separator">/</span>
+                    <span id="detail-collaborator-name" class="breadcrumb-current">Nome</span>
+                </div>
+                <div id="collaborator-meetings-list" class="file-list"></div>
+            </section>
+
         </main>
     </div>
 
