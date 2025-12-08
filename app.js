@@ -14,7 +14,7 @@ const app = {
     // Configuration
     config: {
         // ATENÇÃO: Ao fazer deploy público, restrinja esta chave no Google Cloud Console para o domínio do seu site.
-        apiKey: 'AIzaSyAPL6A4ODxTLNBe-v2GZn0935JSMfBKZD0',
+        apiKey: 'AIzaSyBR2I9CnBnwWcuvfkodkCBtAC76TMg08ok',
         apiUrl: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent'
     },
 
@@ -239,21 +239,12 @@ const app = {
                     "duration": "Estimativa baseada no texto (ex: 30 min)",
                     "overallScore": 0-100 (Nota geral de qualidade da reunião),
                     "metrics": {
-                        "Conhecimento Técnico": 0-100,
-                        "Rapport": 0-100,
-                        "Estratégia em Marketplaces": 0-100,
-                        "Comunicação Clara": 0-100,
-                        "Resolução de Problemas": 0-100
-                    },
-                    "feedback": [
-                        {
-                            "category": "Nome da métrica relacionada",
-                            "issue": "O que foi feito errado ou poderia melhorar",
-                            "suggestion": "Sugestão acionável",
-                            "timestamp": "Momento aproximado (ex: Começo, Meio ou HH:MM:SS)",
-                            "severity": "warning ou critical"
-                        }
-                    ]
+                        "Conhecimento Técnico": { "score": 0-100, "reasoning": "Explicação clara do porquê desta nota, citando exemplos.", "improvement": "O que fazer para melhorar na próxima." },
+                        "Rapport": { "score": 0-100, "reasoning": "...", "improvement": "..." },
+                        "Estratégia em Marketplaces": { "score": 0-100, "reasoning": "...", "improvement": "..." },
+                        "Comunicação Clara": { "score": 0-100, "reasoning": "...", "improvement": "..." },
+                        "Resolução de Problemas": { "score": 0-100, "reasoning": "...", "improvement": "..." }
+                    }
                 }
             `;
 
@@ -317,36 +308,57 @@ const app = {
 
     // --- DASHBOARD RENDERING ---
     renderDashboard: function (data) {
-        // Texts
+        // Meta Info
         document.getElementById('res-type').textContent = data.meetingType;
         document.getElementById('res-duration').textContent = data.duration;
         document.getElementById('res-objective').textContent = data.objective;
 
-        // Feedback List
-        const list = document.getElementById('feedback-container');
+        // Total Score & Progress Bar
+        const score = data.overallScore || 0;
+        document.getElementById('total-score-display').textContent = score;
+
+        const progressBar = document.getElementById('score-progress-bar');
+        // Reset width first to trigger animation
+        progressBar.style.width = '0%';
+        setTimeout(() => {
+            progressBar.style.width = `${score}%`;
+        }, 100);
+
+        // Metrics Breakdown
+        const list = document.getElementById('metrics-breakdown');
         list.innerHTML = '';
 
-        if (data.feedback && data.feedback.length > 0) {
-            data.feedback.forEach(item => {
-                const el = document.createElement('div');
-                el.className = `feedback-item ${item.severity}`;
-                el.innerHTML = `
-                    <div class="feedback-header">
-                        <span style="font-weight: 600; color: var(--primary);">${item.category}</span>
-                        <span class="badge ${item.severity}">${item.severity}</span>
-                    </div>
-                    <p style="margin-bottom: 0.5rem;"><strong>Problema:</strong> ${item.issue}</p>
-                    <p style="color: var(--text-muted); font-size: 0.9rem;">👉 ${item.suggestion}</p>
-                    <div style="margin-top:0.5rem; font-size: 0.8rem; opacity: 0.7;">⏱ ${item.timestamp || 'N/A'}</div>
-                `;
-                list.appendChild(el);
-            });
-        } else {
-            list.innerHTML = '<p>Nenhum ponto crítico encontrado. Parabéns!</p>';
+        const metrics = data.metrics;
+        for (const [key, value] of Object.entries(metrics)) {
+            // Handle both old format (simple number) and new format (object) for backward compatibility
+            const metricScore = typeof value === 'object' ? value.score : value;
+            const reasoning = typeof value === 'object' ? value.reasoning : "Sem detalhes disponíveis.";
+            const improvement = typeof value === 'object' ? value.improvement : "Sem sugestões disponíveis.";
+
+            const el = document.createElement('div');
+            el.className = 'metric-card';
+            el.innerHTML = `
+                <div class="metric-header">
+                    <div class="metric-title">${key}</div>
+                    <div class="metric-score ${this.getScoreClass(metricScore)}">${metricScore}</div>
+                </div>
+                <div class="metric-content">
+                    <h5>🔎 Por que essa nota?</h5>
+                    <p class="metric-text">${reasoning}</p>
+                    
+                    <h5>🚀 Como melhorar</h5>
+                    <p class="metric-text">${improvement}</p>
+                </div>
+            `;
+            list.appendChild(el);
         }
 
-        // Chart
-        this.drawRadarChart(data.metrics);
+        // Chart (Prepare simple object for chart)
+        const simpleMetrics = {};
+        for (const [key, value] of Object.entries(metrics)) {
+            simpleMetrics[key] = typeof value === 'object' ? value.score : value;
+        }
+        this.drawRadarChart(simpleMetrics);
     },
 
     drawRadarChart: function (metricsObj) {
@@ -377,7 +389,7 @@ const app = {
         const centerY = height / 2;
 
         // Ensure radius is never negative. If (min/2) < 40, set radius to 0 to avoid crash
-        const radius = Math.max(0, (Math.min(width, height) / 2) - 40);
+        const radius = Math.max(0, (Math.min(width, height) / 2) - 30); // Reduced padding for better fit
 
         // Data prep
         const labels = Object.keys(metricsObj);
@@ -583,4 +595,3 @@ const app = {
 document.addEventListener('DOMContentLoaded', () => {
     app.init();
 });
-
