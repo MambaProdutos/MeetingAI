@@ -14,7 +14,7 @@ const app = {
     // Configuration
     config: {
         // ATENÇÃO: Ao fazer deploy público, restrinja esta chave no Google Cloud Console para o domínio do seu site.
-        apiKey: 'AIzaSyAkbYOEFJ50Tza_jlFs7xovoZCHrK6tKRQ',
+        apiKey: 'AIzaSyC-PRnyozxTZ6bQcH_pZi9QYkpDjpXIJcM',
         apiUrl: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent'
     },
 
@@ -595,4 +595,5 @@ const app = {
 document.addEventListener('DOMContentLoaded', () => {
     app.init();
 });
+
 
