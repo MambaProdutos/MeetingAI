@@ -682,3 +682,49 @@ input[type="file"]::-webkit-file-upload-button:hover {
     color: var(--text-main);
     font-weight: 500;
 }
+
+/* DIFFICULTIES SECTION */
+.difficulty-card {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.diff-header {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    color: var(--danger);
+    font-size: 1.1rem;
+    margin-bottom: 0.8rem;
+}
+
+.diff-context {
+    font-style: italic;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+    padding-left: 1rem;
+    border-left: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.diff-suggestion {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.8rem;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 1rem;
+    border-radius: 8px;
+    color: var(--text-main);
+}
+
+.diff-icon {
+    font-size: 1.2rem;
+}
+
+/* Force Chart Resize */
+.chart-wrapper {
+    width: 500px !important;
+    height: 500px !important;
+}
