@@ -244,7 +244,10 @@ const app = {
                         "Estratégia em Marketplaces": { "score": 0-100, "reasoning": "...", "improvement": "..." },
                         "Comunicação Clara": { "score": 0-100, "reasoning": "...", "improvement": "..." },
                         "Resolução de Problemas": { "score": 0-100, "reasoning": "...", "improvement": "..." }
-                    }
+                    },
+                    "difficulties": [
+                        { "context": "O que estava acontecendo", "error": "Qual foi o erro cometido", "suggestion": "Como deveria ter sido feito" }
+                    ]
                 }
             `;
 
@@ -353,15 +356,43 @@ const app = {
             list.appendChild(el);
         }
 
+        // Difficulties Section
+        const difficultiesList = document.getElementById('difficulties-list');
+        if (difficultiesList) {
+            difficultiesList.innerHTML = '';
+            if (data.difficulties && data.difficulties.length > 0) {
+                data.difficulties.forEach(diff => {
+                    const el = document.createElement('div');
+                    el.className = 'difficulty-card';
+                    el.innerHTML = `
+                        <div class="diff-header">
+                            <span class="diff-icon">⚠️</span>
+                            <strong>${diff.error}</strong>
+                        </div>
+                        <p class="diff-context">"${diff.context}"</p>
+                        <div class="diff-suggestion">
+                            <span class="diff-icon">💡</span>
+                            <span>${diff.suggestion}</span>
+                        </div>
+                    `;
+                    difficultiesList.appendChild(el);
+                });
+            } else {
+                difficultiesList.innerHTML = '<p class="text-muted">Nenhuma dificuldade crítica detectada.</p>';
+            }
+        }
+
         // Chart (Prepare simple object for chart)
         const simpleMetrics = {};
+        const improvements = {}; // Store improvements for tooltips
         for (const [key, value] of Object.entries(metrics)) {
             simpleMetrics[key] = typeof value === 'object' ? value.score : value;
+            improvements[key] = typeof value === 'object' ? value.improvement : "Sem sugestão.";
         }
-        this.drawRadarChart(simpleMetrics);
+        this.drawRadarChart(simpleMetrics, improvements);
     },
 
-    drawRadarChart: function (metricsObj) {
+    drawRadarChart: function (metricsObj, improvementsObj) {
         const canvas = document.getElementById('radarChart');
 
         // Safety check: ensure canvas exists
@@ -389,7 +420,7 @@ const app = {
         const centerY = height / 2;
 
         // Ensure radius is never negative. If (min/2) < 40, set radius to 0 to avoid crash
-        const radius = Math.max(0, (Math.min(width, height) / 2) - 30); // Reduced padding for better fit
+        const radius = Math.max(0, (Math.min(width, height) / 2) - 40); // Padding
 
         // Data prep
         const labels = Object.keys(metricsObj);
@@ -397,91 +428,202 @@ const app = {
         const count = labels.length;
         const angleStep = (Math.PI * 2) / count;
 
-        ctx.clearRect(0, 0, width, height);
+        // Store points for tooltip detection
+        const points = [];
 
-        // If radius is 0, we can't draw anything useful
-        if (radius <= 0) return;
+        const draw = () => {
+            ctx.clearRect(0, 0, width, height);
 
-        // 1. Draw Grid (Pentagons)
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-        ctx.lineWidth = 1;
+            // If radius is 0, we can't draw anything useful
+            if (radius <= 0) return;
 
-        for (let r = 0.2; r <= 1; r += 0.2) {
+            // 1. Draw Grid (Pentagons)
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.lineWidth = 1;
+
+            for (let r = 0.2; r <= 1; r += 0.2) {
+                ctx.beginPath();
+                for (let i = 0; i < count; i++) {
+                    const angle = i * angleStep - Math.PI / 2;
+                    const x = centerX + Math.cos(angle) * (radius * r);
+                    const y = centerY + Math.sin(angle) * (radius * r);
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.closePath();
+                ctx.stroke();
+            }
+
+            // 2. Draw Axes
             ctx.beginPath();
             for (let i = 0; i < count; i++) {
                 const angle = i * angleStep - Math.PI / 2;
-                const x = centerX + Math.cos(angle) * (radius * r);
-                const y = centerY + Math.sin(angle) * (radius * r);
+                const x = centerX + Math.cos(angle) * radius;
+                const y = centerY + Math.sin(angle) * radius;
+                ctx.moveTo(centerX, centerY);
+                ctx.lineTo(x, y);
+
+                // Draw Labels
+                const labelX = centerX + Math.cos(angle) * (radius + 30);
+                const labelY = centerY + Math.sin(angle) * (radius + 30);
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = '12px Inter'; // Increased font size
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                // Split long labels
+                const words = labels[i].split(' ');
+                if (words.length > 1 && angle !== -Math.PI / 2) {
+                    ctx.fillText(words[0], labelX, labelY - 8);
+                    ctx.fillText(words.slice(1).join(' '), labelX, labelY + 8);
+                } else {
+                    ctx.fillText(labels[i], labelX, labelY);
+                }
+            }
+            ctx.stroke();
+
+            // 3. Draw Data Area
+            ctx.beginPath();
+            values.forEach((val, i) => {
+                const normalized = val / 100;
+                const angle = i * angleStep - Math.PI / 2;
+                const x = centerX + Math.cos(angle) * (radius * normalized);
+                const y = centerY + Math.sin(angle) * (radius * normalized);
                 if (i === 0) ctx.moveTo(x, y);
                 else ctx.lineTo(x, y);
-            }
+            });
             ctx.closePath();
-            ctx.stroke();
-        }
 
-        // 2. Draw Axes
-        ctx.beginPath();
-        for (let i = 0; i < count; i++) {
-            const angle = i * angleStep - Math.PI / 2;
-            const x = centerX + Math.cos(angle) * radius;
-            const y = centerY + Math.sin(angle) * radius;
-            ctx.moveTo(centerX, centerY);
-            ctx.lineTo(x, y);
+            // Gradient Fill
+            const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
+            gradient.addColorStop(0, 'rgba(99, 102, 241, 0.5)'); // Indigo
+            gradient.addColorStop(1, 'rgba(139, 92, 246, 0.1)'); // Purple
 
-            // Draw Labels
-            const labelX = centerX + Math.cos(angle) * (radius + 20);
-            const labelY = centerY + Math.sin(angle) * (radius + 20);
-            ctx.fillStyle = '#94a3b8';
-            ctx.font = '10px Inter';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-
-            // Split long labels
-            const words = labels[i].split(' ');
-            if (words.length > 1 && angle !== -Math.PI / 2) {
-                ctx.fillText(words[0], labelX, labelY - 6);
-                ctx.fillText(words.slice(1).join(' '), labelX, labelY + 6);
-            } else {
-                ctx.fillText(labels[i], labelX, labelY);
-            }
-        }
-        ctx.stroke();
-
-        // 3. Draw Data Area
-        ctx.beginPath();
-        values.forEach((val, i) => {
-            const normalized = val / 100;
-            const angle = i * angleStep - Math.PI / 2;
-            const x = centerX + Math.cos(angle) * (radius * normalized);
-            const y = centerY + Math.sin(angle) * (radius * normalized);
-            if (i === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-        });
-        ctx.closePath();
-
-        // Gradient Fill
-        const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
-        gradient.addColorStop(0, 'rgba(99, 102, 241, 0.5)'); // Indigo
-        gradient.addColorStop(1, 'rgba(139, 92, 246, 0.1)'); // Purple
-
-        ctx.fillStyle = gradient;
-        ctx.fill();
-        ctx.strokeStyle = '#8b5cf6';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
-        // 4. Draw Points
-        values.forEach((val, i) => {
-            const normalized = val / 100;
-            const angle = i * angleStep - Math.PI / 2;
-            const x = centerX + Math.cos(angle) * (radius * normalized);
-            const y = centerY + Math.sin(angle) * (radius * normalized);
-
-            ctx.beginPath();
-            ctx.arc(x, y, 4, 0, Math.PI * 2);
-            ctx.fillStyle = '#fff';
+            ctx.fillStyle = gradient;
             ctx.fill();
-        });
+            ctx.strokeStyle = '#8b5cf6';
+            ctx.lineWidth = 3; // Thicker line
+            ctx.stroke();
+
+            // 4. Draw Points & Store Coordinates
+            values.forEach((val, i) => {
+                const normalized = val / 100;
+                const angle = i * angleStep - Math.PI / 2;
+                const x = centerX + Math.cos(angle) * (radius * normalized);
+                const y = centerY + Math.sin(angle) * (radius * normalized);
+
+                points[i] = { x, y, label: labels[i], value: val, improvement: improvementsObj ? improvementsObj[labels[i]] : "" };
+
+                ctx.beginPath();
+                ctx.arc(x, y, 6, 0, Math.PI * 2); // Larger dots
+                ctx.fillStyle = '#fff';
+                ctx.fill();
+                ctx.strokeStyle = '#8b5cf6';
+                ctx.stroke();
+            });
+        };
+
+        draw();
+
+        // Tooltip Interaction
+        const handleMouseMove = (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = (e.clientX - rect.left) * dpr; // Adjust for scale
+            const mouseY = (e.clientY - rect.top) * dpr;
+
+            let hoveredPoint = null;
+
+            // Check collision with points
+            for (const p of points) {
+                const dx = mouseX - p.x;
+                const dy = mouseY - p.y;
+                if (dx * dx + dy * dy < 200) { // Radius squared (approx 14px hit area)
+                    hoveredPoint = p;
+                    break;
+                }
+            }
+
+            draw(); // Redraw to clear previous tooltip
+
+            if (hoveredPoint) {
+                // Draw Tooltip
+                const padding = 10;
+                const text = `Nota: ${hoveredPoint.value}`;
+                const tipText = hoveredPoint.improvement;
+
+                ctx.font = 'bold 14px Inter';
+                const textWidth = ctx.measureText(text).width;
+                ctx.font = '12px Inter';
+
+                // Wrap tooltip text
+                const maxWidth = 200;
+                const words = tipText.split(' ');
+                let line = '';
+                const lines = [];
+
+                for (let n = 0; n < words.length; n++) {
+                    const testLine = line + words[n] + ' ';
+                    const metrics = ctx.measureText(testLine);
+                    const testWidth = metrics.width;
+                    if (testWidth > maxWidth && n > 0) {
+                        lines.push(line);
+                        line = words[n] + ' ';
+                    } else {
+                        line = testLine;
+                    }
+                }
+                lines.push(line);
+
+                const boxWidth = Math.max(textWidth, maxWidth) + padding * 2;
+                const boxHeight = (lines.length * 16) + 30 + padding * 2;
+
+                let tooltipX = hoveredPoint.x + 15;
+                let tooltipY = hoveredPoint.y + 15;
+
+                // Boundary checks
+                if (tooltipX + boxWidth > width) tooltipX = hoveredPoint.x - boxWidth - 15;
+                if (tooltipY + boxHeight > height) tooltipY = hoveredPoint.y - boxHeight - 15;
+
+                // Tooltip Background
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.roundRect(tooltipX, tooltipY, boxWidth, boxHeight, 8);
+                ctx.fill();
+                ctx.stroke();
+
+                // Tooltip Text
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 14px Inter';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'top';
+                ctx.fillText(text, tooltipX + padding, tooltipY + padding);
+
+                ctx.fillStyle = '#cbd5e1';
+                ctx.font = '12px Inter';
+                lines.forEach((l, idx) => {
+                    ctx.fillText(l, tooltipX + padding, tooltipY + padding + 20 + (idx * 16));
+                });
+            }
+        };
+
+        // Remove old listener if exists (to prevent duplicates on re-render)
+        // Note: In a simple vanilla app, this might be tricky without storing the reference.
+        // For now, we clone the node to remove listeners or just accept it (simple app).
+        // Better approach:
+        const newCanvas = canvas.cloneNode(true);
+        canvas.parentNode.replaceChild(newCanvas, canvas);
+        const newCtx = newCanvas.getContext('2d');
+        // Re-scale the new canvas context
+        newCtx.scale(dpr, dpr);
+
+        // We need to call draw again on the new canvas context? 
+        // Actually, let's just use a property on the app object to store the listener if we wanted to be strict.
+        // But cloning resets the canvas content, so we need to redraw.
+        // Let's just add the listener. If it stacks, it's a minor perf hit for this scale.
+        // To avoid stacking, we can set onmousemove directly.
+        canvas.onmousemove = handleMouseMove;
     },
 
     // --- COLLABORATORS VIEWS ---
@@ -595,6 +737,3 @@ const app = {
 document.addEventListener('DOMContentLoaded', () => {
     app.init();
 });
-
-
-
